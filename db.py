@@ -8,10 +8,10 @@ def open_connection():
 def get_last_in_queue():
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
-    select_query = "SELECT id, message, pushed, creation_time FROM webpush_queue"
+    select_query = "(SELECT id, message, pushed, creation_time FROM webpush_queue"
     " WHERE pushed = false"
     " ORDER BY creation_time ASC"
-    " LIMIT 1"
+    " LIMIT 1)"
     
     try:
         db_cursor.execute(select_query)
