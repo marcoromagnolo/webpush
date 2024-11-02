@@ -5,7 +5,7 @@ DB_SETTINGS = {
     'database': 'webpush',
 }
 
-VAPID_CLAIMS_SUB_MAILTO = "info@scienzenotizie.it"
+VAPID_CLAIMS_SUB_MAILTO = "mail@example.com"
 SCHEDULE_EVERY_MINUTES = 1
 
 
