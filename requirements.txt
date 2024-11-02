@@ -1,0 +1,8 @@
+flask
+Flask-API
+Flask-SQLAlchemy
+py-vapid
+cryptography
+pywebpush
+mysql-connector-python
+schedule
