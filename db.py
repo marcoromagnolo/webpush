@@ -5,22 +5,23 @@ def open_connection():
     db_connection = mysql.connector.connect(**DB_SETTINGS)
     return db_connection
 
-def get_last_in_queue():
+def get_last_message():
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
-    select_query = "(SELECT id, message, pushed, creation_time FROM webpush_queue"
+    select_query = ("SELECT id, title, options, pushed, creation_time FROM webpush_messages"
     " WHERE pushed = false"
     " ORDER BY creation_time ASC"
-    " LIMIT 1)"
+    " LIMIT 1")
     
     try:
         db_cursor.execute(select_query)
         row = db_cursor.fetchone()
         if row:
-            id, message, pushed, creation_time = row
+            id, title, options, pushed, creation_time = row
             return {
                 'id': id,
-                'message': message,
+                'title': title,
+                'options': options,
                 'pushed': pushed,
                 'creation_time': creation_time
             }
@@ -28,12 +29,12 @@ def get_last_in_queue():
         db_cursor.close()
         db_connection.close()
 
-def add_message_to_queue(message):
+def add_message(data):
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
 
-    insert_query = ("INSERT INTO webpush_queue (message, pushed) VALUES (%s, %s)")
-    data = (message, 0)
+    insert_query = ("INSERT INTO webpush_messages (title, options, pushed) VALUES (%s, %s, %s)")
+    data = (data["title"], data["options"], 0)
 
     try:
         db_cursor.execute(insert_query, data)
@@ -45,11 +46,11 @@ def add_message_to_queue(message):
         db_cursor.close()
         db_connection.close()
 
-def set_queue_message_pushed(id):
+def set_message_pushed(id):
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
 
-    insert_query = ("UPDATE webpush_queue set pushed=true WHERE id=%s")
+    insert_query = ("UPDATE webpush_messages set pushed=true WHERE id=%s")
     data = (id, )
 
     try:
@@ -120,12 +121,12 @@ def remove_subscriber(subscriber):
         db_cursor.close()
         db_connection.close()        
 
-def add_queue_log(log):
+def add_log_message(log):
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
 
-    insert_query = ("INSERT INTO webpush_queue_log (message, total_subscribers, total_pushes, start_time, end_time) VALUES (%s, %s, %s, %s, %s)")
-    data = (log["message"], log["total_subscribers"], log["total_pushes"], log["start_time"], log["end_time"])
+    insert_query = ("INSERT INTO webpush_log_messages (title, options, total_subscribers, total_pushes, start_time, end_time) VALUES (%s, %s, %s, %s, %s, %s)")
+    data = (log["title"], log["options"], log["total_subscribers"], log["total_pushes"], log["start_time"], log["end_time"])
 
     try:
         db_cursor.execute(insert_query, data)

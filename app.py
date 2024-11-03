@@ -8,13 +8,11 @@ from settings import WEB_SETTINGS, SCHEDULE_EVERY_MINUTES
 from datetime import datetime
 
 from flask import request, Response, render_template, jsonify, Flask
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": WEB_SETTINGS["cors_origins"]}})
 app.config['SECRET_KEY'] = '9OLWxND4o83j4K4iuopO'
-
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 @app.route("/subscription/", methods=["GET", "POST"])
 def subscription():
@@ -41,33 +39,15 @@ def subscription():
     
 @app.route("/push_message/",methods=['POST'])
 def push_message():
-    message = request.form.get('message')
-    print(request, message)
-    try:
-        db.add_message_to_queue(message)
-        return Response(status=200)
-    except Exception as e:
-        print("error",e)
-        return Response(status=403)
-
-@app.route("/test/",methods=['POST'])
-def push_v1():
-    print("is_json",request.is_json)
-
-    if not request.json or not request.json.get('sub_token'):
-        return jsonify({'failed':1})
-
-    print("request.json",request.json)
-
-    sub_token = request.json.get('sub_token')
-    message = request.json.get('message')
-    try:
-        token = json.loads(sub_token)
-        notifier.send_web_push(token, message)
-        return jsonify({'success':1})
-    except Exception as e:
-        print("error",e)
-        return jsonify({'failed':str(e)}) 
+    data = request.json
+    print(request, data)
+    if data:
+        try:
+            db.add_message(data)
+            return Response(status=200)
+        except Exception as e:
+            print("error",e)
+    return Response(status=403)
 
 def run_scheduler():
 

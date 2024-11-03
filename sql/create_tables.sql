@@ -1,6 +1,7 @@
-create table if not exists webpush_queue(
+create table if not exists webpush_messages(
 	id int auto_increment,
-	message varchar(1000) not null,
+	title varchar(255) not null,
+	options text default null,
 	pushed boolean not null,
 	creation_time timestamp default current_timestamp,
 	primary key(id)
@@ -26,9 +27,10 @@ create table if not exists webpush_subscribers(
 ALTER TABLE webpush_subscribers
 ADD INDEX idx_expiration_time (expiration_time);
 
-create table if not exists webpush_queue_log(
+create table if not exists webpush_log_messages(
 	id int auto_increment,
-	message varchar(1000) not null,
+	title varchar(255) not null,
+	options text default null,
 	total_subscribers int not null,
 	total_pushes int not null,
 	start_time timestamp default current_timestamp,

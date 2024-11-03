@@ -37,11 +37,11 @@
 
 			<hr>
 			<p>You can test push notification below.</p>
-			<button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored" onclick="push_message('test message v1')">Test Push Notification</button>
+			<button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored" onclick="push_message({title: 'test message v1'})">Test Push Notification</button>
 		</section>
 	</main>
 
-	<script src="{{ url_for('static',filename='main.js') }}"></script>
+    <script src="{{ url_for('static',filename='main.js') }}"></script>
 	<script src="https://code.getmdl.io/1.2.1/material.min.js"></script>
 </body>
 

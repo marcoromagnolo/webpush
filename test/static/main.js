@@ -50,7 +50,7 @@ function updateSubscriptionOnServer(subscription) {
 		console.log("subscription_token", JSON.stringify(subscription));
 		$.ajax({
 			type: "POST",
-			url: "/subscription/",
+			url: "http://localhost:8080/subscription/",
 			contentType: 'application/json; charset=utf-8',
 			dataType:'json',
 			data: JSON.stringify({
@@ -141,7 +141,7 @@ function initializeUI() {
 if ('serviceWorker' in navigator && 'PushManager' in window) {
 	console.log('Service Worker and Push is supported');
 
-	navigator.serviceWorker.register("/static/sw.js")
+	navigator.serviceWorker.register("static/sw.js")
 		.then(function(swReg) {
 			console.log('Service Worker is registered', swReg);
 
@@ -179,7 +179,7 @@ function push_message(message) {
 $(document).ready(function(){
 	$.ajax({
 		type:"GET",
-		url:'/subscription/',
+		url:'http://localhost:8080/subscription/',
 		contentType: 'application/json; charset=utf-8',
 		dataType:'json',
 		data: "",
