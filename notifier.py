@@ -17,28 +17,29 @@ VAPID_CLAIMS = {
 "sub": f"mailto:{VAPID_CLAIMS_SUB_MAILTO}"
 }
 
-def send_web_push(subscription_information, title, options):
-    message_data = {"title": title}
-    if options: 
+def send_web_push(subscription_information, title, opts_str):
+    data = {"title": title}
+    if opts_str:
+        options = json.loads(opts_str)
         # Visual
-        if options["body"]: message_data["body"] = options["body"] # <String>
-        if options["icon"]: message_data["icon"] = options["icon"] # <URL String>
-        if options["image"]: message_data["image"] = options["image"] # <URL String>
-        if options["badge"]: message_data["badge"] = options["badge"] # <URL String>
-        if options["dir"]: message_data["dir"] = options["dir"] # <String of 'auto' | 'ltr' | 'rtl'  >
+        if "body" in options: data["body"] = options["body"] # <String>
+        if "icon" in options: data["icon"] = options["icon"] # <URL String>
+        if "image" in options: data["image"] = options["image"] # <URL String>
+        if "badge" in options: data["badge"] = options["badge"] # <URL String>
+        if "dir" in options: data["dir"] = options["dir"] # <String of 'auto' | 'ltr' | 'rtl'  >
 
         # Visual & Behavioral
-        if options["timestamp"]: message_data["timestamp"] = options["timestamp"] # <Long>
-        if options["actions"]: message_data["actions"] = options["actions"] # <Array of String>
-        if options["data"]: message_data["data"] = options["data"] # <Anything>
+        if "timestamp" in options: data["timestamp"] = options["timestamp"] # <Long>
+        if "actions" in options: data["actions"] = options["actions"] # <Array of String>
+        if "data" in options: data["data"] = options["data"] # <Anything>
 
         # Beahvioral Options
-        if options["tag"]: message_data["tag"] = options["tag"] # <String>
-        if options["requireInteraction"]: message_data["requireInteraction"] = options["requireInteraction"] # <boolean>
-        if options["renotify"]: message_data["renotify"] = options["renotify"] # <Boolean>
-        if options["vibrate"]: message_data["vibrate"] = options["vibrate"] # <Array of Integers>
-        if options["sound"]: message_data["sound"] = options["sound"] # <URL String>
-        if options["silent"]: message_data["silent"] = options["silent"] # <Boolean>
+        if "tag" in options: data["tag"] = options["tag"] # <String>
+        if "requireInteraction" in options: data["requireInteraction"] = options["requireInteraction"] # <boolean>
+        if "renotify" in options: data["renotify"] = options["renotify"] # <Boolean>
+        if "vibrate" in options: data["vibrate"] = options["vibrate"] # <Array of Integers>
+        if "sound" in options: data["sound"] = options["sound"] # <URL String>
+        if "silent" in options: data["silent"] = options["silent"] # <Boolean>
 
     # Add aud if is google
     parsed_url = urlparse(subscription_information.get("endpoint"))
@@ -47,20 +48,20 @@ def send_web_push(subscription_information, title, options):
     
     return webpush(
         subscription_info=subscription_information,
-        data=json.dumps(message_data),
+        data=json.dumps(data),
         vapid_private_key=VAPID_PRIVATE_KEY,
         vapid_claims=VAPID_CLAIMS
     )    
 
 def massive_push():
     print("Massive Push Job starting...")
-    last = db.get_last_message()
+    message = db.get_last_message()
 
-    if last:
-        print("Load last message from queue: ", last)
+    if message:
+        print("Load last message from queue: ", message)
         log = {
-            "title": last["title"],
-            "options": last["options"],
+            "title": message["title"],
+            "options": message["options"],
             "total_subscribers": 0,
             "total_pushes": 0,
             "start_time": datetime.now(),
@@ -81,8 +82,8 @@ def massive_push():
                 }}
             
             try:
-                print("Send push request: ", token)
-                push_response = send_web_push(token, last["title"], last["options"])
+                print("Send push request: ", token, message)
+                push_response = send_web_push(token, message["title"], message["options"])
                 print("Received push response: ", push_response)
 
                 if push_response.status_code in (200, 201):
@@ -90,11 +91,11 @@ def massive_push():
                     
             except WebPushException:
                 # remove subscriber
-                print("Remove subscriber ", subscriber)
+                print("Remove invalid subscriber ", subscriber)
                 db.remove_subscriber(subscriber)
             
         # set webpush_queue.pushed = 1
-        db.set_message_pushed(last["id"])
+        db.set_message_pushed(message["id"])
 
         # add a row in webpush_log
         log["end_time"] = datetime.now()

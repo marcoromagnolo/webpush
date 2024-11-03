@@ -1,17 +1,27 @@
 'use strict';
 
 self.addEventListener('push', function(event) {
-  const data = event.data ? event.data.json() : {};
+  const data = event.data?.json() ?? {};
   console.log(`[Service Worker] Push Received with data: "${data}"`);
   
   const title = data.title;
   const options = {
-    body: data.body,
-    icon: 'images/icon.png',
-    badge: 'images/badge.png',
-    data: {
-      url: data.data.url
-    }
+    body: data.body ?? null,
+    icon: data.icon ?? null,
+    image: data.image ?? null,
+    badge: data.badge ?? null,
+    dir: data.dir ?? 'auto',
+    timestamp: data.timestamp ?? null,
+
+    actions: null,
+    data: { url: data.data?.url ?? null },
+
+    tag: null,
+    requireInteraction: data.requireInteraction ?? false,
+    renotify: data.renotify ?? null,
+    vibrate: data.vibrate ?? null,
+    sound: data.sound ?? null,
+    silent: data.silent ?? null
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

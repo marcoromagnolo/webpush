@@ -29,12 +29,12 @@ def get_last_message():
         db_cursor.close()
         db_connection.close()
 
-def add_message(data):
+def add_message(title, options):
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
 
     insert_query = ("INSERT INTO webpush_messages (title, options, pushed) VALUES (%s, %s, %s)")
-    data = (data["title"], data["options"], 0)
+    data = (title, options, 0)
 
     try:
         db_cursor.execute(insert_query, data)

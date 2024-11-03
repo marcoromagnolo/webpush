@@ -43,7 +43,7 @@ def push_message():
     print(request, data)
     if data:
         try:
-            db.add_message(data)
+            db.add_message(data["title"], json.dumps(data["options"]))
             return Response(status=200)
         except Exception as e:
             print("error",e)
