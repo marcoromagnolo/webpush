@@ -43,8 +43,7 @@ def send_web_push(subscription_information, title, opts_str):
 
     # Add aud if is google
     parsed_url = urlparse(subscription_information.get("endpoint"))
-    if "google.com" in parsed_url.netloc:
-        VAPID_CLAIMS["aud"] = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    VAPID_CLAIMS["aud"] = f"{parsed_url.scheme}://{parsed_url.netloc}"
     
     return webpush(
         subscription_info=subscription_information,
@@ -54,11 +53,11 @@ def send_web_push(subscription_information, title, opts_str):
     )    
 
 def massive_push():
-    print("Massive Push Job starting...")
+    logging.info("Check new message")
     message = db.get_last_message()
 
     if message:
-        print("Load last message from queue: ", message)
+        logging.info(f"Found one message in queue, ready for push: {message}")
         log = {
             "title": message["title"],
             "options": message["options"],
@@ -69,7 +68,7 @@ def massive_push():
         }
         
         subscribers = db.get_subscribers()
-        print("There are ", len(subscribers), " subscribers")
+        logging.info(f"There are {len(subscribers)}, {subscribers}")
 
         for subscriber in subscribers:
             log["total_subscribers"] += 1    
@@ -82,26 +81,28 @@ def massive_push():
                 }}
             
             try:
-                print("Send push request: ", token, message)
+                logging.info(f"Send push request: {token}, {message}")
                 push_response = send_web_push(token, message["title"], message["options"])
-                print("Received push response: ", push_response)
+                logging.info(f"Received push response: {push_response}")
 
                 if push_response.status_code in (200, 201):
                     log["total_pushes"] += 1
                     
-            except WebPushException:
+            except WebPushException as e:
+                logging.error(e)
                 # remove subscriber
-                print("Remove invalid subscriber ", subscriber)
-                db.remove_subscriber(subscriber)
+                # logging.warning(f"Remove invalid subscriber {subscriber}")
+                # db.remove_subscriber(subscriber)
             
         # set webpush_queue.pushed = 1
+        logging.debug(f"Set message with id={message["id"]} as pushed")
         db.set_message_pushed(message["id"])
 
         # add a row in webpush_log
         log["end_time"] = datetime.now()
+        logging.debug(f"Log pushing details: {log}")
         db.add_log_message(log)
+        logging.info("Massive Push Job end.")
 
     else:
-        print("The queue is empty")
-
-    print("Massive Push Job end.")
+        logging.info("The queue is empty")

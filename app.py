@@ -20,43 +20,52 @@ def subscription():
         POST creates a subscription
         GET returns vapid public key which clients uses to send around push notification
     """
-    print(request)
+    logging.info(f"{request}, {request.json}")
 
-    if request.method == "GET":
-        return Response(response=json.dumps({"public_key": notifier.VAPID_PUBLIC_KEY}),
-            headers={"Access-Control-Allow-Origin": "*"}, content_type="application/json")
-    
-    if request.method == "POST" and request.json:
-        subscription_token = request.json.get("subscription_token")
-        subscription_token["expiration_time"] = subscription_token["expirationTime"]
-        subscription_token["keys_p256dh"] = subscription_token["keys"]["p256dh"]
-        subscription_token["keys_auth"] = subscription_token["keys"]["auth"]
-        db.add_subscriber(subscription_token)
-        return Response(response=json.dumps({'success':1}),
-            headers={"Access-Control-Allow-Origin": "*"}, content_type="application/json")
+    try:
+        if request.method == "GET":
+            return Response(response=json.dumps({"public_key": notifier.VAPID_PUBLIC_KEY}),
+                headers={"Access-Control-Allow-Origin": "*"}, content_type="application/json")
+        
+        if request.method == "POST" and request.json:
+            subscription_token = request.json.get("subscription_token")
+            subscription_token["expiration_time"] = subscription_token["expirationTime"]
+            subscription_token["keys_p256dh"] = subscription_token["keys"]["p256dh"]
+            subscription_token["keys_auth"] = subscription_token["keys"]["auth"]
+            db.add_subscriber(subscription_token)
+            return Response(response=json.dumps({'success':1}),
+                headers={"Access-Control-Allow-Origin": "*"}, content_type="application/json")
+        
+    except Exception as e:
+        logging.error(e)
 
     return Response(status=201, mimetype="application/json")
     
 @app.route("/push_message/",methods=['POST'])
 def push_message():
+    """
+        POST add message to queue
+    """
     data = request.json
-    print(request, data)
-    if data:
-        try:
-            db.add_message(data["title"], json.dumps(data["options"]))
-            return Response(status=200)
-        except Exception as e:
-            print("error",e)
+    logging.info(f"{request}, {data}")
+
+    try:
+        db.add_message(data["title"], json.dumps(data["options"]))
+        return Response(status=200)
+    except Exception as e:
+        logging.error(e)
+
     return Response(status=403)
 
 def run_scheduler():
-
+    logging.info("Start scheduler for massive push")
     while True:
         schedule.run_pending()
         time.sleep(1)
 
 if __name__ == "__main__":
 
+    logging.info(f"Configure scheduler for running every {SCHEDULE_EVERY_MINUTES} minutes.")
     schedule.every(SCHEDULE_EVERY_MINUTES).minutes.do(notifier.massive_push)
 
     threading.Thread(target=run_scheduler).start()

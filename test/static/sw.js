@@ -1,8 +1,8 @@
 'use strict';
 
 self.addEventListener('push', function(event) {
+  console.log(`[Service Worker] Push Received with data: "${JSON.stringify(event.data)}"`);
   const data = event.data?.json() ?? {};
-  console.log(`[Service Worker] Push Received with data: "${data}"`);
   
   const title = data.title;
   const options = {
@@ -13,7 +13,7 @@ self.addEventListener('push', function(event) {
     dir: data.dir ?? 'auto',
     timestamp: data.timestamp ?? null,
 
-    actions: null,
+    actions: data.actions ?? [],
     data: { url: data.data?.url ?? null },
 
     tag: null,
