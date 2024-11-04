@@ -1,6 +1,6 @@
 ### Get VAPID_PUBLIC_KEY
 
-GET http://localhost:8080/subscription HTTP/1.1
+GET https://localhost:8080/subscription HTTP/1.1
 
 ### Subscribe a client
 

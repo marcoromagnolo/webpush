@@ -91,8 +91,8 @@ def massive_push():
             except WebPushException as e:
                 logging.error(e)
                 # remove subscriber
-                # logging.warning(f"Remove invalid subscriber {subscriber}")
-                # db.remove_subscriber(subscriber)
+                logging.warning(f"Remove invalid subscriber {subscriber}")
+                db.remove_subscriber(subscriber)
             
         # set webpush_queue.pushed = 1
         logging.debug(f"Set message with id={message['id']} as pushed")

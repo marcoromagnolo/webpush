@@ -20,14 +20,15 @@ def subscription():
         POST creates a subscription
         GET returns vapid public key which clients uses to send around push notification
     """
-    logging.info(f"{request}, {request.json}")
 
     try:
         if request.method == "GET":
+            logging.info(f"{request}")
             return Response(response=json.dumps({"public_key": notifier.VAPID_PUBLIC_KEY}),
                 headers={"Access-Control-Allow-Origin": "*"}, content_type="application/json")
         
         if request.method == "POST" and request.json:
+            logging.info(f"{request}, {request.json}")
             subscription_token = request.json.get("subscription_token")
             subscription_token["expiration_time"] = subscription_token["expirationTime"]
             subscription_token["keys_p256dh"] = subscription_token["keys"]["p256dh"]

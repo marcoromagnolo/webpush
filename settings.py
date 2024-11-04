@@ -7,8 +7,6 @@ DB_SETTINGS = {
 
 VAPID_CLAIMS_SUB_MAILTO = "mail@example.com"
 SCHEDULE_EVERY_MINUTES = 1
-CORS_ORIGINS = ""
-
 
 WEB_SETTINGS = {
     'host': 'localhost',
