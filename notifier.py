@@ -95,7 +95,7 @@ def massive_push():
                 # db.remove_subscriber(subscriber)
             
         # set webpush_queue.pushed = 1
-        logging.debug(f"Set message with id={message["id"]} as pushed")
+        logging.debug(f"Set message with id={message['id']} as pushed")
         db.set_message_pushed(message["id"])
 
         # add a row in webpush_log
