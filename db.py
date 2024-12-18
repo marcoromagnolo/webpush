@@ -8,10 +8,12 @@ def open_connection():
 def get_last_message():
     db_connection = open_connection()
     db_cursor = db_connection.cursor()
-    select_query = ("SELECT id, title, options, pushed, creation_time FROM webpush_messages"
-    " WHERE pushed = false"
-    " ORDER BY creation_time ASC"
-    " LIMIT 1")
+    select_query = """
+        SELECT id, title, options, pushed, creation_time FROM webpush_messages
+        WHERE pushed = false
+        ORDER BY creation_time ASC
+        LIMIT 1
+        """
     
     try:
         db_cursor.execute(select_query)
@@ -137,3 +139,23 @@ def add_log_message(log):
     finally:
         db_cursor.close()
         db_connection.close()                                 
+
+def get_schedules():
+    db_connection = open_connection()
+    db_cursor = db_connection.cursor()
+    select_query = "SELECT day, hour, minute FROM webpush_schedules"
+    
+    try:
+        db_cursor.execute(select_query)
+        schedules = []
+        for row in db_cursor.fetchall():
+            day, hour, minute = row
+            schedules.append({
+                'day': day,
+                'hour': hour,
+                'minute': minute
+            })
+        return schedules
+    finally:
+        db_cursor.close()
+        db_connection.close()

@@ -1,6 +1,11 @@
 private_key.txt
 public_key.txt
 vapid_private.pem
+webpush.pid
+log
+
+#Editor
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

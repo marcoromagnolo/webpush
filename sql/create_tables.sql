@@ -7,6 +7,14 @@ create table if not exists webpush_messages(
 	primary key(id)
 );
 
+create table if not exists webpush_schedules(
+	id int auto_increment,
+    day int not null,
+	hour int NOT NULL,
+    minute int NOT NULL,
+	primary key(id)
+);
+
 create table if not exists webpush_requests(
 	id int auto_increment,
 	queue_id int not null,

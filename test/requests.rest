@@ -1,36 +1,74 @@
 ### Get VAPID_PUBLIC_KEY
 
-GET https://localhost:8080/subscription HTTP/1.1
+GET https://www.scienzenotizie.it/notify/subscription/ HTTP/1.1
 
 ### Subscribe a client
 
-POST http://localhost:8080/subscription HTTP/1.1
+POST https://www.scienzenotizie.it/notify/subscription/ HTTP/1.1
 content-type: application/json
 
 {
-    "endpoint":"https://updates.push.services.mozilla.com/wpush/v2/gAAAAABnKN2_5id0ZFYI5BJjRcz-Ly3JCY7ZhngcrwBxgIs-n_6UCaspQ5oeI2Qq2ULeSFXK5lO4gE8aKGGu7zrWBZJwDlosZDCtRGvGdj79-jBVYNKYczIjXgB4XWrr8Lt_3Pqeoy00JjimWZrW6jpkpw0cFKiOMagBqag3O0WQPFKW6fcIXoA",
-    "expirationTime":null,
-    "keys":{
-        "auth":"A5SQrEo9dzbnUeDvgdR1ZQ",
-        "p256dh":"BBMIyKM6OnkH0TOYZl3ghn3xRv-h8w13vTpN1rG21KYw1zw4PsFhWsCMf55Or_j31WQlbmVNfA_-1JaTgr1ghhw"
-        }
+    "subscription_token": {
+        "endpoint":"https://updates.push.services.mozilla.com/wpush/v2/gAAAAABnKN2_5id0ZFYI5BJjRcz-Ly3JCY7ZhngcrwBxgIs-n_6UCaspQ5oeI2Qq2ULeSFXK5lO4gE8aKGGu7zrWBZJwDlosZDCtRGvGdj79-jBVYNKYczIjXgB4XWrr8Lt_3Pqeoy00JjimWZrW6jpkpw0cFKiOMagBqag3O0WQPFKW6fcIXoA",
+        "expirationTime":null,
+        "keys":{
+            "auth":"A5SQrEo9dzbnUeDvgdR1ZQ",
+            "p256dh":"BBMIyKM6OnkH0TOYZl3ghn3xRv-h8w13vTpN1rG21KYw1zw4PsFhWsCMf55Or_j31WQlbmVNfA_-1JaTgr1ghhw"
+            }
+    }
 }
 
 ### Send Push Notification
 
-POST http://localhost:8080/push_message HTTP/1.1
+POST https://www.scienzenotizie.it/notify/push_message/ HTTP/1.1
 content-type: application/json
 
 {
-    "title": "Eruzione vulcanica in Indonesia: ci sono diversi morti e migliaia di sfollati",
+    "title": "Giove non ha superficie. Ecco come è possibile",
     "options": {
-        "body": "Eruzione del vulcano Lewotobi Laki Laki: 10 morti e migliaia di sfollati a Flores, Indonesia.", 
-        "icon": "/static/images/icon.png",
-        "badge": "/static/images/badge.png",
+        "body": "Giove: il gigante gassoso senza superficie che nasconde misteri affascinanti e svolge un ruolo cruciale nella protezione della Terra.", 
+        "icon": "https://www.scienzenotizie.it/wp-content/themes/newsplus/images/icon.png",
+        "badge": "https://www.scienzenotizie.it/wp-content/themes/newsplus/images/badge.png",
         "image": "https://www.scienzenotizie.it/wp-content/uploads/2024/11/tangled-earbud-cable-m.jpg", 
         "data": {
-            "url": "https://www.scienzenotizie.it/2024/11/04/eruzione-vulcanica-in-indonesia-ci-sono-diversi-morti-e-migliaia-di-sfollati-4496324"
+            "url": "https://www.scienzenotizie.it/2024/11/06/giove-non-ha-superficie-ecco-come-e-possibile-1096464"
             },
-        "tag": "eruzione-vulcanica-in-indonesia-ci-sono-diversi-morti-e-migliaia-di-sfollati-4496324"
+        "tag": "giove-non-ha-superficie-ecco-come-e-possibile-1096464"
+    }
+}
+
+curl --header "Content-Type: application/json" \
+  --request POST \
+  --data '{
+        "title": "Giove non ha superficie. Ecco come è possibile",
+        "options": {
+            "body": "Giove: il gigante gassoso senza superficie che nasconde misteri affascinanti e svolge un ruolo cruciale nella protezione della Terra.", 
+            "icon": "https://www.scienzenotizie.it/wp-content/themes/newsplus/images/icon.png",
+            "badge": "https://www.scienzenotizie.it/wp-content/themes/newsplus/images/badge.png",
+            "image": "https://www.scienzenotizie.it/wp-content/uploads/2024/11/tangled-earbud-cable-m.jpg", 
+            "data": {
+                "url": "https://www.scienzenotizie.it/2024/11/06/giove-non-ha-superficie-ecco-come-e-possibile-1096464"
+                },
+            "tag": "giove-non-ha-superficie-ecco-come-e-possibile-1096464"
+        }
+    }' \
+  http://localhost:8080/push_message/
+
+### Send Push Notification
+
+POST http://localhost:8080/push_message/ HTTP/1.1
+content-type: application/json
+
+{
+    "title": "Giove non ha superficie. Ecco come è possibile",
+    "options": {
+        "body": "Giove: il gigante gassoso senza superficie che nasconde misteri affascinanti e svolge un ruolo cruciale nella protezione della Terra.", 
+        "icon": "https://www.scienzenotizie.it/wp-content/themes/newsplus/images/icon.png",
+        "badge": "https://www.scienzenotizie.it/wp-content/themes/newsplus/images/badge.png",
+        "image": "https://www.scienzenotizie.it/wp-content/uploads/2024/11/tangled-earbud-cable-m.jpg", 
+        "data": {
+            "url": "https://www.scienzenotizie.it/2024/11/06/giove-non-ha-superficie-ecco-come-e-possibile-1096464"
+            },
+        "tag": "giove-non-ha-superficie-ecco-come-e-possibile-1096464"
     }
 }
