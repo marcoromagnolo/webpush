@@ -1,4 +1,4 @@
-create table if not exists webpush_messages(
+create table if not exists messages(
 	id int auto_increment,
 	title varchar(255) not null,
 	options text default null,
@@ -7,7 +7,7 @@ create table if not exists webpush_messages(
 	primary key(id)
 );
 
-create table if not exists webpush_schedules(
+create table if not exists schedules(
 	id int auto_increment,
     day int not null,
 	hour int NOT NULL,
@@ -15,7 +15,7 @@ create table if not exists webpush_schedules(
 	primary key(id)
 );
 
-create table if not exists webpush_requests(
+create table if not exists requests(
 	id int auto_increment,
 	queue_id int not null,
 	subscriber_id int not null,
@@ -23,7 +23,7 @@ create table if not exists webpush_requests(
 	primary key(id)
 );
 
-create table if not exists webpush_subscribers(
+create table if not exists subscribers(
 	id int auto_increment,
     endpoint varchar(1000) not null,
     expiration_time timestamp default null,
@@ -32,10 +32,10 @@ create table if not exists webpush_subscribers(
 	primary key(id)
 );
 
-ALTER TABLE webpush_subscribers
+ALTER TABLE subscribers
 ADD INDEX idx_expiration_time (expiration_time);
 
-create table if not exists webpush_log_messages(
+create table if not exists log_messages(
 	id int auto_increment,
 	title varchar(255) not null,
 	options text default null,

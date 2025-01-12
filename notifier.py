@@ -52,7 +52,7 @@ def send_web_push(subscription_information, title, opts_str):
         vapid_claims=VAPID_CLAIMS
     )    
 
-def push_last_message(logger):
+def push_last_message(logger, schedule):
     logger.info("Check new message")
     message = db.get_last_message()
 
@@ -67,7 +67,27 @@ def push_last_message(logger):
             "end_time": ""
         }
         
-        subscribers = db.get_subscribers()
+        # split schedules in pages by hour:minute (already ordered from the query)
+        pages = len(db.get_schedule_by_day(schedule['day']))
+        logger.debug(f"There are {pages} pages from schedules")
+        tmp_index = 0
+        page_index = 1
+        for single_shedule in db.get_schedule_by_day(schedule['day']):
+            tmp_index = tmp_index + 1
+            if single_shedule['hour'] == schedule['hour'] and single_shedule['minute'] == schedule['minute']:
+                page_index = tmp_index
+            
+        logger.debug(f"Page index {page_index}")
+
+        # take the total size of all subscribers
+        total = db.get_total_subscribers()
+        logger.debug(f"Total subscribers {total}")
+
+        # calculate page size by total and page
+        page_size = int(total / pages) + 1
+        logger.debug(f"Page size is {page_size}")
+
+        subscribers = db.get_subscribers_paged(page_index, page_size)
         logger.info(f"There are {len(subscribers)}, {subscribers}")
 
         for subscriber in subscribers:
@@ -94,11 +114,11 @@ def push_last_message(logger):
                 logger.warning(f"Remove invalid subscriber {subscriber}")
                 db.remove_subscriber(subscriber)
             
-        # set webpush_queue.pushed = 1
+        # set queue.pushed = 1
         logger.debug(f"Set message with id={message['id']} as pushed")
         db.set_message_pushed(message["id"])
 
-        # add a row in webpush_log
+        # add a row in log_messagges
         log["end_time"] = datetime.now()
         logger.debug(f"Log pushing details: {log}")
         db.add_log_message(log)
