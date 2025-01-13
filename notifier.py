@@ -1,11 +1,12 @@
 import logg
 from urllib.parse import urlparse
 import json, os
+import math
 from datetime import datetime
 import requests
 from pywebpush import webpush, WebPushException
 import db
-from settings import VAPID_CLAIMS_SUB_MAILTO
+from settings import VAPID_CLAIMS_SUB_MAILTO, MESSAGE_FOR_DAY
 
 DER_BASE64_ENCODED_PRIVATE_KEY_FILE_PATH = os.path.join(os.getcwd(),"private_key.txt")
 DER_BASE64_ENCODED_PUBLIC_KEY_FILE_PATH = os.path.join(os.getcwd(),"public_key.txt")
@@ -76,16 +77,17 @@ def push_last_message(logger, schedule):
             tmp_index = tmp_index + 1
             if single_shedule['hour'] == schedule['hour'] and single_shedule['minute'] == schedule['minute']:
                 page_index = tmp_index
-            
-        logger.debug(f"Page index {page_index}")
-
+        
         # take the total size of all subscribers
         total = db.get_total_subscribers()
         logger.debug(f"Total subscribers {total}")
 
+        page_index = math.ceil(page_index / MESSAGE_FOR_DAY)
+        logger.debug(f"Page index: {page_index}")
+
         # calculate page size by total and page
-        page_size = int(total / pages) + 1
-        logger.debug(f"Page size is {page_size}")
+        page_size = math.ceil(total / pages) * MESSAGE_FOR_DAY
+        logger.debug(f"Page size: {page_size}")
 
         subscribers = db.get_subscribers_paged(page_index, page_size)
         logger.info(f"There are {len(subscribers)}, {subscribers}")

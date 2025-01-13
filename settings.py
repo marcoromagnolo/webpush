@@ -7,6 +7,8 @@ DB_SETTINGS = {
 
 VAPID_CLAIMS_SUB_MAILTO = "mail@example.com"
 
+MESSAGE_FOR_DAY = 3
+
 WEB_SETTINGS = {
     'host': 'localhost',
     'port': '8080',
