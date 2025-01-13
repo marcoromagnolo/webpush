@@ -90,7 +90,7 @@ def push_last_message(logger, schedule):
         logger.debug(f"Page size: {page_size}")
 
         subscribers = db.get_subscribers_paged(page_index, page_size)
-        logger.info(f"There are {len(subscribers)}, {subscribers}")
+        logger.info(f"Subscribers loaded: {len(subscribers)}")
 
         for subscriber in subscribers:
             log["total_subscribers"] += 1    
