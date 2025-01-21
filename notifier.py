@@ -74,9 +74,9 @@ def push_last_message(logger, schedule):
             logger.error("No schedules found for the day.")
             return
         
-        # split schedules in pages by hour:minute (already ordered from the query)
-        pages = len(db.get_schedule_by_day(schedule['day']))
-        logger.debug(f"There are {pages} pages from schedules")
+        # split schedules in times by hour:minute (already ordered from the query)
+        times = len(db.get_schedule_by_day(schedule['day']))
+        logger.debug(f"There are {times} schedules for day: {schedule['day']}")
         
         page_index = 1
         tmp_index = 1
@@ -89,11 +89,11 @@ def push_last_message(logger, schedule):
         total = db.get_total_subscribers()
         logger.debug(f"Total subscribers {total}")
 
-        #page_index = math.ceil(page_index / MESSAGE_FOR_DAY)
-        logger.debug(f"Page index: {page_index}")
+        pages = math.ceil(times / MESSAGE_FOR_DAY)
+        logger.debug(f"Page {page_index} of {pages}")
 
         # calculate page size by total and page
-        page_size = math.ceil(total / pages) * MESSAGE_FOR_DAY
+        page_size = math.ceil(total / times) * MESSAGE_FOR_DAY
         logger.debug(f"Page size: {page_size}")
 
         subscribers = db.get_subscribers_paged(page_index, page_size)
