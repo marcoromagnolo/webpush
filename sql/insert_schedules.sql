@@ -1,4 +1,5 @@
 -- Monday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (1,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (1,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (1,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (1,11,0);
@@ -15,6 +16,7 @@ INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (1,21,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (1,22,0);
 
 -- Thursday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (2,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (2,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (2,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (2,11,0);
@@ -31,6 +33,7 @@ INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (2,21,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (2,22,0);
 
 -- Wednsday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (3,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (3,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (3,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (3,11,0);
@@ -47,6 +50,7 @@ INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (3,21,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (3,22,0);
 
 -- Tuesday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (4,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (4,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (4,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (4,11,0);
@@ -63,6 +67,7 @@ INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (4,21,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (4,22,0);
 
 -- Friday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (5,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (5,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (5,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (5,11,0);
@@ -79,6 +84,7 @@ INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (5,21,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (5,22,0);
 
 -- Saturday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (6,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (6,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (6,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (6,11,0);
@@ -95,6 +101,7 @@ INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (6,21,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (6,22,0);
 
 -- Sunday
+INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (7,8,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (7,9,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (7,10,0);
 INSERT INTO webpush.schedules (`day`,`hour`,`minute`) VALUES (7,11,0);
