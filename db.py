@@ -110,6 +110,7 @@ def get_subscribers_paged(page_index, page_size):
     select_query =  """
                         SELECT id, endpoint, expiration_time, keys_p256dh, keys_auth 
                         FROM subscribers
+                        ORDER BY id
                         LIMIT %s
                         OFFSET %s
                     """
