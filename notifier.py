@@ -77,23 +77,31 @@ def push_last_message(logger, schedule):
         # split schedules in times by hour:minute (already ordered from the query)
         times = len(db.get_schedule_by_day(schedule['day']))
         logger.debug(f"There are {times} schedules for day: {schedule['day']}")
-        
-        page_index = 1
-        tmp_index = 1
-        for single_shedule in day_schedules:
-            if single_shedule['hour'] == schedule['hour'] and single_shedule['minute'] == schedule['minute']:
-                page_index = (tmp_index - 1) % MESSAGE_FOR_DAY + 1
-            tmp_index = tmp_index + 1    
-        
-        # take the total size of all subscribers
-        total = db.get_total_subscribers()
-        logger.debug(f"Total subscribers {total}")
+
+        if times == 0:
+            logger.error("No schedules found for today.")
+            return
 
         pages = math.ceil(times / MESSAGE_FOR_DAY)
         logger.debug(f"Page {page_index} of {pages}")
+        
+        page_index = 1
+        tmp_index = 0
+        for single_shedule in day_schedules:
+            if single_shedule['hour'] == schedule['hour'] and single_shedule['minute'] == schedule['minute']:
+                page_index = tmp_index % pages + 1
+            tmp_index += 1    
+        
+        # take the total size of all subscribers
+        total = db.get_total_subscribers()
+        if total == 0:
+            logger.error("Total subscribers is zero.")
+            return
+
+        logger.debug(f"Total subscribers {total}")
 
         # calculate page size by total and page
-        page_size = math.ceil(total / times) * MESSAGE_FOR_DAY
+        page_size = math.ceil(total / pages)
         logger.debug(f"Page size: {page_size}")
 
         subscribers = db.get_subscribers_paged(page_index, page_size)
