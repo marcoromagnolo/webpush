@@ -82,15 +82,15 @@ def push_last_message(logger, schedule):
             logger.error("No schedules found for today.")
             return
 
-        pages = math.ceil(times / MESSAGE_FOR_DAY)
-        logger.debug(f"Page {page_index} of {pages}")
-        
+        pages = math.ceil(times / MESSAGE_FOR_DAY)        
         page_index = 1
         tmp_index = 0
         for single_shedule in day_schedules:
             if single_shedule['hour'] == schedule['hour'] and single_shedule['minute'] == schedule['minute']:
                 page_index = tmp_index % pages + 1
             tmp_index += 1    
+
+        logger.debug(f"Page {page_index} of {pages}")
         
         # take the total size of all subscribers
         total = db.get_total_subscribers()
