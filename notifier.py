@@ -18,6 +18,8 @@ VAPID_CLAIMS = {
 "sub": f"mailto:{VAPID_CLAIMS_SUB_MAILTO}"
 }
 
+logger = logg.create_logger('notifier')
+
 def send_web_push(subscription_information, title, opts_str):
     data = {"title": title}
     if opts_str:
@@ -53,7 +55,7 @@ def send_web_push(subscription_information, title, opts_str):
         vapid_claims=VAPID_CLAIMS
     )    
 
-def push_last_message(logger, schedule):
+def push_last_message(schedule):
     logger.info("Check new message")
     message = db.get_last_message()
 

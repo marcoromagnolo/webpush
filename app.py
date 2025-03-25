@@ -75,19 +75,19 @@ if __name__ == "__main__":
         day = sched['day']
         hhmm = f"{sched['hour']:02}:{sched['minute']:02}"
         if day == 1:
-            schedule.every().monday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().monday.at(hhmm).do(notifier.push_last_message, sched)
         elif day == 2:
-            schedule.every().tuesday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().tuesday.at(hhmm).do(notifier.push_last_message, sched)
         elif day == 3:
-            schedule.every().wednesday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().wednesday.at(hhmm).do(notifier.push_last_message, sched)
         elif day == 4:
-            schedule.every().thursday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().thursday.at(hhmm).do(notifier.push_last_message, sched)
         elif day == 5:
-            schedule.every().friday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().friday.at(hhmm).do(notifier.push_last_message, sched)
         elif day == 6:
-            schedule.every().saturday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().saturday.at(hhmm).do(notifier.push_last_message, sched)
         elif day == 7:
-            schedule.every().sunday.at(hhmm).do(notifier.push_last_message, logger, sched)
+            schedule.every().sunday.at(hhmm).do(notifier.push_last_message, sched)
 
     next_job = min(schedule.jobs, key=lambda job: job.next_run)
     logger.info("Next job run at: " + str(next_job.next_run))
