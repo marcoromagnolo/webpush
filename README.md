@@ -251,8 +251,15 @@ Server setup (once per server, as an administrator)
 Server installation (as the user `webpush`)
 -------------------------------------------
 
-Without sudo, except step 6 (nginx). Every block of commands is complete: a new shell doesn't keep the variables of
-the previous steps.
+Steps 1-5 run in a shell of the user `webpush`, without sudo. `/srv/webpush` belongs to `webpush` with mode 750
+(*Server setup*, step 2): your administrator user can't enter it (`cd /srv/webpush/app`: *Permission denied*) and
+must not create anything there with `sudo` (the files would belong to root). From your administrator user open the
+shell of `webpush` first:
+
+    sudo -iu webpush        # the prompt becomes webpush@...; exit goes back to your user
+
+Every block of commands is complete: a new shell doesn't keep the variables of the previous steps. Step 6 (nginx)
+needs an administrator: `exit` first.
 
 1. Code:
 
@@ -318,7 +325,7 @@ the previous steps.
 
 5. Check: `curl http://127.0.0.1:8080/health` (`{"ok":true}`).
 
-6. nginx (**as an administrator**): the application on a path of a site with https, e.g. `/notify` of
+6. nginx (**as an administrator**: `exit` from the shell of `webpush`): the application on a path of a site with https, e.g. `/notify` of
    `www.example.com` (in its `server` block):
 
        location /notify/ {
@@ -512,7 +519,8 @@ and start the old version of the code.
 Updates
 =======
 
-Update an installation to the last version of the repository, as its owner:
+Update an installation to the last version of the repository, as its owner (on the server, `sudo -iu webpush`
+first):
 
     cd /srv/webpush/app                                # or ~/Projects/webpush
     old=$(git rev-parse HEAD)
