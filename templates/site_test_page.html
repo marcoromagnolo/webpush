@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+    {% if wrong_origin %}
+        <div class="alert alert-warning">
+            The console is open at an address different from <code>PUBLIC_URL</code> ({{ public_url }}): the API refuses the
+            subscriptions of this page. Open it at <a href="{{ public_url }}{{ url_for('site_test_page', site_id=site.id) }}">{{ public_url }}</a>.
+        </div>
+    {% endif %}
+
+    <div class="row g-3">
+        <section class="col-lg-5 mb-0">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="h5 mb-0">Test page <span class="text-muted small">{{ site.name }}</span></h3>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('site_edit', site_id=site.id) }}">Back to the site</a>
+                </div>
+                <div class="card-body">
+                    <p class="small">This page plays a page of <b>{{ site.name }}</b> with the code of <i>Integration</i>
+                        (<code>webpush-client.js</code>, <code>webpush-sw.js</code>, public API): this browser subscribes as a
+                        visitor of the site and receives its messages. The log on the right shows every step.</p>
+
+                    <div class="d-flex flex-wrap align-items-center gap-2 p-3 border rounded bg-body-tertiary mb-3">
+                        <button type="button" class="btn btn-primary" data-webpush-toggle hidden data-label-on="Disable notifications">Enable notifications</button>
+                        <span class="small">State: <b id="state">...</b></span>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary" id="diagnose">1. Diagnose: browser, service worker, subscription, server</button>
+                        <button type="button" class="btn btn-outline-success" id="send-test">2. Send a test notification to this browser</button>
+                    </div>
+                    <p class="small text-muted mt-2 mb-0">The test notification goes only to this browser and shows the answer of the
+                        push service; it doesn't use the queue. Then try a real message:
+                        <a href="{{ url_for('message_new') }}">New message</a> &gt; <b>Send now to all</b>.</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h3 class="h6 mb-0">Details</h3></div>
+                <div class="card-body small">
+                    <dl class="row info mb-2">
+                        <dt class="col-4">API</dt><dd class="col-8"><code>{{ api_url }}</code></dd>
+                        <dt class="col-4">Site code</dt><dd class="col-8"><code>{{ site.code }}</code></dd>
+                        <dt class="col-4">Service worker</dt><dd class="col-8"><code>{{ url_for('site_test_page_service_worker', site_id=site.id) }}</code></dd>
+                        <dt class="col-4">VAPID key</dt><dd class="col-8"><code class="text-break">{{ site.vapid_public_key or 'none' }}</code></dd>
+                    </dl>
+                    <p class="text-muted mb-0">This browser is a normal subscriber of the site: <b>Disable notifications</b> removes it.
+                        Only for the tests of the messages (button <i>Send test</i>) use the test browsers of
+                        <a href="{{ url_for('site_edit', site_id=site.id) }}#integration">Integration</a>.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="col-lg-7 mb-0">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="h6 mb-0">Debug log</h3>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="copy-log">Copy</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="clear-log">Clear</button>
+                    </div>
+                </div>
+                <div class="debug-log" id="log" aria-live="polite"></div>
+            </div>
+        </section>
+    </div>
+</main>
+<script src="{{ url_for('static', filename='webpush-client.js') }}"></script>
+<script>
+    (function () {
+        var SITE = {code: {{ site.code|tojson }}, publicKey: {{ (site.vapid_public_key or '')|tojson }}};
+        var API = {{ api_url|tojson }};
+        var WORKER = {{ url_for('site_test_page_service_worker', site_id=site.id)|tojson }};
+        var PUBLIC_ORIGIN = {{ public_url|tojson }}.replace(/^(https?:\/\/[^/]+).*$/, '$1');
+        var URLS = {inspect: {{ url_for('site_test_page_inspect', site_id=site.id)|tojson }},
+                    send: {{ url_for('site_test_page_send', site_id=site.id)|tojson }}};
+        var CSRF = {{ (csrf_access_token or '')|tojson }};
+        var logBox = document.getElementById('log');
+
+        // Log: one line per step, level ok | info | warn | error, optional hint (how to fix)
+        function log(level, text, detail, hint) {
+            var line = document.createElement('div');
+            line.className = 'debug-line debug-' + level;
+            var time = new Date().toLocaleTimeString();
+            var mark = {ok: '✔', info: '•', warn: '!', error: '✖'}[level];
+            line.textContent = time + '  ' + mark + ' ' + text;
+            if (detail !== undefined && detail !== null && detail !== '') {
+                var pre = document.createElement('div');
+                pre.className = 'debug-detail';
+                pre.textContent = typeof detail === 'string' ? detail : JSON.stringify(detail, null, 2);
+                line.appendChild(pre);
+            }
+            if (hint) {
+                var tip = document.createElement('div');
+                tip.className = 'debug-hint';
+                tip.textContent = '→ ' + hint;
+                line.appendChild(tip);
+            }
+            logBox.appendChild(line);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function post(url, body) {
+            return fetch(url, {method: 'POST', credentials: 'same-origin',
+                headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF}, body: JSON.stringify(body)
+            }).then(function (response) {
+                if (response.status === 401 || response.redirected) throw new Error('Session of the console expired: log in again');
+                return response.json();
+            });
+        }
+
+        function keyOf(subscription) {
+            var buffer = subscription.options && subscription.options.applicationServerKey;
+            if (!buffer) return null;
+            return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        function showState(state) {
+            var labels = {subscribed: 'subscribed', unsubscribed: 'not subscribed',
+                          blocked: 'blocked: allow the notifications in the settings of the site (lock icon in the address bar)',
+                          unsupported: 'push not supported (https or localhost / 127.0.0.1 needed)'};
+            document.getElementById('state').textContent = labels[state] || state;
+        }
+
+        // The steps of the client (debug hook of webpush-client.js), its errors and the events of the service worker
+        WebPush.init({api: API, site: SITE.code, serviceWorker: WORKER, debug: function (step, detail) {
+            log('info', step, detail);
+        }});
+        document.addEventListener('webpush:change', function (event) {
+            showState(event.detail);
+            log(event.detail === 'subscribed' ? 'ok' : 'info', 'state: ' + event.detail);
+        });
+        document.addEventListener('webpush:error', function (event) {
+            log('error', 'the button failed', event.detail, 'Run Diagnose to find the step that fails.');
+        });
+        var swEvents = [];
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', function (event) {
+                if (!event.data || event.data.type !== 'webpush:sw') return;
+                swEvents.push(event.data.event);
+                var level = /NOT/.test(event.data.event) ? 'error' : 'ok';
+                log(level, 'service worker: ' + event.data.event, event.data.detail,
+                    level === 'error' ? 'The browser refused to show it: permission of the site or of the system.' :
+                    event.data.event === 'notification shown' ? 'Shown by the browser: if you don\'t see it, the system hides it ' +
+                        '(Do not disturb / Focus, notifications of the browser off in the system settings).' : null);
+            });
+        }
+        WebPush.state().then(function (state) {
+            showState(state);
+            log('info', 'page loaded: state ' + state);
+        });
+
+        // 1. Diagnose
+        function diagnose() {
+            log('info', '--- Diagnose ---');
+            var ok = true;
+            function fail(text, detail, hint) { ok = false; log('error', text, detail, hint); }
+
+            // browser
+            if (!window.isSecureContext) fail('page not in a secure context', location.origin,
+                'Push needs https, or http on localhost / 127.0.0.1.');
+            else log('ok', 'secure context', location.origin);
+            var missing = ['serviceWorker', 'PushManager', 'Notification'].filter(function (name) {
+                return name === 'serviceWorker' ? !('serviceWorker' in navigator) : !(name in window);
+            });
+            if (missing.length) {
+                fail('browser without ' + missing.join(', '), navigator.userAgent,
+                    'Use Chrome, Edge or Firefox; Safari on iOS only for a site added to the Home screen.');
+                return Promise.resolve();
+            }
+            log('ok', 'browser supports push', navigator.userAgent);
+            if (location.origin !== PUBLIC_ORIGIN) fail('origin of the page is not PUBLIC_URL', location.origin + ' != ' + PUBLIC_ORIGIN,
+                'Open the console at PUBLIC_URL, or set PUBLIC_URL in .env to this address and restart.');
+            else log('ok', 'origin of the page allowed (PUBLIC_URL)', location.origin);
+
+            // permission
+            var permission = Notification.permission;
+            if (permission === 'denied') fail('permission: denied', null,
+                'Lock icon in the address bar > Notifications > Allow, then reload.');
+            else log(permission === 'granted' ? 'ok' : 'warn', 'permission: ' + permission, null,
+                permission === 'default' ? 'Click Enable notifications: the browser asks.' : null);
+
+            // keys of the site
+            if (!SITE.publicKey) fail('the site has no VAPID keys', null, 'Sites > the site > Keys > Generate.');
+
+            return fetch(API + '/sites/' + SITE.code + '/vapid-public-key').then(function (response) {
+                return response.json().then(function (body) {
+                    if (!response.ok) fail('GET vapid-public-key: ' + response.status, body,
+                        response.status === 404 ? 'The site is disabled or the code is wrong.' : null);
+                    else log('ok', 'GET vapid-public-key: ' + response.status, body.public_key);
+                });
+            }).catch(function (e) {
+                fail('API not reachable', API + ': ' + e.message, 'Is the application running? Is the url right?');
+            }).then(function () {
+                return navigator.serviceWorker.getRegistration(WORKER);
+            }).then(function (registration) {
+                if (!registration) {
+                    log('warn', 'service worker: not registered yet', WORKER, 'Click Enable notifications: it registers it.');
+                    return null;
+                }
+                var worker = registration.active || registration.waiting || registration.installing;
+                log(registration.active ? 'ok' : 'warn', 'service worker: ' + (worker ? worker.state : 'none'),
+                    {scope: registration.scope, script: worker && worker.scriptURL});
+                return registration.pushManager.getSubscription();
+            }).then(function (subscription) {
+                if (!subscription) {
+                    if (subscription === null) log('warn', 'subscription: none in this browser', null, 'Click Enable notifications.');
+                    return null;
+                }
+                var key = keyOf(subscription);
+                var info = {push_service: new URL(subscription.endpoint).host, endpoint: subscription.endpoint,
+                            expirationTime: subscription.expirationTime};
+                if (key && key !== SITE.publicKey) fail('subscription made with another VAPID key', {subscription_key: key, site_key: SITE.publicKey},
+                    'The keys of the site changed: Disable and Enable notifications again.');
+                else log('ok', 'subscription in the browser', info);
+                return post(URLS.inspect, {endpoint: subscription.endpoint, public_key: key}).then(function (server) {
+                    if (!server.found) {
+                        fail('subscription unknown to the server', null,
+                            'The POST of the subscription failed: Disable and Enable notifications, look at the errors above.');
+                    } else if (!server.active) {
+                        fail('subscription removed on the server: ' + server.removed_reason, server,
+                            'Disable and Enable notifications to subscribe again.');
+                    } else {
+                        log(server.failures ? 'warn' : 'ok', 'subscription on the server: active' +
+                            (server.failures ? ', ' + server.failures + ' failed sendings' : ''), server,
+                            server.last_error ? 'Last answer of the push service: ' + server.last_error : null);
+                    }
+                });
+            }).catch(function (e) {
+                fail('diagnose stopped', e.message);
+            }).then(function () {
+                log(ok ? 'ok' : 'warn', ok ? 'Diagnose: everything is fine, now send a test notification (2.)'
+                                           : 'Diagnose: fix the errors above (in order) and run it again');
+            });
+        }
+
+        // 2. Test notification to this browser, with the answer of the push service
+        function sendTest() {
+            log('info', '--- Test notification ---');
+            WebPush.subscription().then(function (subscription) {
+                if (!subscription) {
+                    log('error', 'this browser is not subscribed', null, 'Click Enable notifications first.');
+                    return;
+                }
+                swEvents = [];
+                log('info', 'sending through the server', new URL(subscription.endpoint).host);
+                return post(URLS.send, {endpoint: subscription.endpoint}).then(function (result) {
+                    if (result.ok) {
+                        log('ok', 'push service: ' + result.status + ' ' + (result.reason || '') + ' in ' + result.elapsed_ms + ' ms', result, result.hint);
+                        // the service worker tells if the push arrived and was shown
+                        setTimeout(function () {
+                            if (swEvents.indexOf('push received') < 0) {
+                                log('warn', 'no push received by the service worker after 15 seconds', null,
+                                    'Accepted by the push service but not delivered yet: browser offline or in power saving, ' +
+                                    'or the page is not controlled by the service worker (reload the page and retry).');
+                            }
+                        }, 15000);
+                    } else {
+                        log('error', 'push service: ' + (result.status ? result.status + ' ' + result.reason : 'not reached'),
+                            result, result.hint);
+                    }
+                });
+            }).catch(function (e) {
+                log('error', 'test failed', e.message);
+            });
+        }
+
+        document.getElementById('diagnose').addEventListener('click', diagnose);
+        document.getElementById('send-test').addEventListener('click', sendTest);
+        document.getElementById('clear-log').addEventListener('click', function () { logBox.textContent = ''; });
+        document.getElementById('copy-log').addEventListener('click', function () {
+            var button = this;
+            navigator.clipboard.writeText(logBox.innerText).then(function () {
+                button.textContent = 'Copied';
+                setTimeout(function () { button.textContent = 'Copy'; }, 2000);
+            });
+        });
+    })();
+</script>
+{% include 'footer.html' %}
+</body>

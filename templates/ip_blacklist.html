@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% elif saved %}
+        <div class="alert alert-success">{{ saved }} saved.</div>
+    {% endif %}
+
+    <section>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="h5 mb-0">IP blacklist</h3>
+            </div>
+            <div class="card-body border-bottom small text-muted">
+                An ip is locked for {{ settings.failed_login_block_duration }} minutes after
+                {{ settings.failed_login_block_threshold }} failed logins or invalid API tokens; these entries are removed
+                automatically when the lock expires. A <b>permanent block</b> stays until you remove it.
+                Your ip is <code>{{ my_ip }}</code>.
+            </div>
+
+            <!-- Add -->
+            <form class="card-body border-bottom" method="POST" action="{{ url_for('ip_blacklist_save') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label class="form-label small mb-1" for="new_ip">IP address{{ info("IPv4 or IPv6 address to block, e.g. 203.0.113.7. Your ip can't be blocked.") }}</label>
+                        <input class="form-control form-control-sm font-monospace" type="text" id="new_ip" name="remote_address"
+                               required maxlength="45" placeholder="203.0.113.7 or 2001:db8::1">
+                    </div>
+                    <div class="col-12 col-md-5 col-lg-5">
+                        <label class="form-label small mb-1" for="new_note">Note{{ info("Why it is blocked: only for you, e.g. login attempts.") }}</label>
+                        <input class="form-control form-control-sm" type="text" id="new_note" name="note" maxlength="255" placeholder="Reason of the block">
+                    </div>
+                    <div class="col-6 col-md-2 col-lg-2">
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="new_blocked" name="blocked" checked>
+                            <label class="form-check-label small" for="new_blocked">Permanent block{{ info("Checked: blocked until you remove it. Unchecked: only watched, locked for a while after too many failed logins or wrong API tokens.") }}</label>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-1 col-lg-2">
+                        <button class="btn btn-sm btn-success w-100" type="submit">Add</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th scope="col">IP address</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-end">Failed requests</th>
+                        <th scope="col">Last failure</th>
+                        <th scope="col">Note{{ info("Why it is in the list: only for you. Saved with the button Save of the row.") }}</th>
+                        <th scope="col" class="text-center">Permanent{{ info("Checked: blocked until you remove it. Unchecked: locked only for a while after too many failures.") }}</th>
+                        <th scope="col" class="text-center">Reset failures{{ info("Sets the failed requests to 0 at Save: the temporary lock ends at once.") }}</th>
+                        <th scope="col"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for ip in ips %}
+                        {% set form_id = 'ip-' ~ loop.index %}
+                        <tr {% if saved == ip.remote_address %}class="table-success"{% endif %}>
+                            <td class="font-monospace">
+                                {{ ip.remote_address }}
+                                {% if ip.remote_address == my_ip %}<span class="badge text-bg-info ms-1">you</span>{% endif %}
+                            </td>
+                            <td class="small text-nowrap">
+                                {% if ip.status == 'blocked' %}
+                                    <span class="badge bg-danger">Blocked</span>
+                                {% elif ip.status == 'locked' %}
+                                    <span class="badge bg-warning text-dark">Locked</span> until {{ ip.until.strftime('%H:%M') }}
+                                {% else %}
+                                    <span class="badge bg-light text-dark border">Watching</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ ip.number_of_requests }}</td>
+                            <td class="small text-nowrap">{{ ip.request_time.strftime('%d/%m/%Y %H:%M') if ip.request_time else '-' }}</td>
+                            <td>
+                                <input class="form-control form-control-sm" type="text" name="note" form="{{ form_id }}"
+                                       maxlength="255" value="{{ ip.note or '' }}">
+                            </td>
+                            <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="blocked" form="{{ form_id }}"
+                                       {% if ip.blocked %}checked{% endif %} {% if ip.remote_address == my_ip %}disabled title="Your ip"{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="reset" form="{{ form_id }}" {% if not ip.number_of_requests %}disabled{% endif %}>
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <form id="{{ form_id }}" method="POST" action="{{ url_for('ip_blacklist_save') }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                    <input type="hidden" name="remote_address" value="{{ ip.remote_address }}">
+                                    <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                                </form>
+                                <form method="POST" action="{{ url_for('ip_blacklist_delete') }}" class="d-inline"
+                                      onsubmit='return confirm({{ ("Remove " ~ ip.remote_address ~ " from the blacklist? It will be unblocked.")|tojson }});'>
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                    <input type="hidden" name="remote_address" value="{{ ip.remote_address }}">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="8" class="text-muted p-4 text-center">No ip in the blacklist.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</main>
+{% include 'footer.html' %}
+</body>

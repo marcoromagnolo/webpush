@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+    {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
+
+    <section>
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="h5 mb-0">Sites <span class="text-muted small">websites that send notifications</span></h3>
+                <a class="btn btn-sm btn-success" href="{{ url_for('site_new') }}">New site</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th scope="col">Site</th>
+                        <th scope="col">Code</th>
+                        <th scope="col" class="text-end">Subscribers</th>
+                        <th scope="col" class="text-end">Queued</th>
+                        <th scope="col" class="text-end">Slots a week</th>
+                        <th scope="col">Status</th>
+                        <th scope="col"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for s in sites %}
+                        <tr class="{{ 'text-muted' if not s.enabled }}">
+                            <td><a href="{{ url_for('site_edit', site_id=s.id) }}">{{ s.name }}</a></td>
+                            <td class="font-monospace small">{{ s.code }}</td>
+                            <td class="text-end">{{ s.subscribers }}</td>
+                            <td class="text-end">{{ s.queued }}</td>
+                            <td class="text-end">{{ s.slots }}</td>
+                            <td>
+                                {% if not s.enabled %}<span class="badge bg-secondary">Disabled</span>
+                                {% elif not s.has_keys %}<span class="badge bg-danger">No VAPID keys</span>
+                                {% elif not s.slots %}<span class="badge bg-warning text-dark">No schedule</span>
+                                {% else %}<span class="badge bg-success">Active</span>{% endif %}
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('site_edit', site_id=s.id) }}">Settings</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('site_edit', site_id=s.id) }}#integration">Integration</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('site_test_page', site_id=s.id) }}">Test page</a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-muted p-4 text-center">No site yet: <a href="{{ url_for('site_new') }}">add the first one</a>.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</main>
+{% include 'footer.html' %}
+</body>

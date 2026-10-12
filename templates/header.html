@@ -1,0 +1,45 @@
+<header>
+    {% set site = current_site() %}
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">WebPush</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavAltMarkup"
+                    aria-controls="navbarNavAltMarkup" aria-expanded="false" aria-label="WebPush">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+                <!-- Site of the pages: every page shows the data of the chosen site, or of all the sites -->
+                <form class="site-select me-lg-3 my-2 my-lg-0" method="GET" action="{{ url_for('select_site') }}">
+                    <input type="hidden" name="next" value="{{ back_url() }}">
+                    <select class="form-select form-select-sm" name="site" aria-label="Site" onchange="this.form.submit()"
+                            title="The pages show the data of this site">
+                        <option value="">All sites</option>
+                        {% for s in all_sites() %}
+                            <option value="{{ s.code }}" {% if site and site.id == s.id %}selected{% endif %}>{{ s.name }}{{ ' (disabled)' if not s.enabled }}</option>
+                        {% endfor %}
+                    </select>
+                    <noscript><button class="btn btn-sm btn-outline-secondary" type="submit">Go</button></noscript>
+                </form>
+                <div class="navbar-nav">
+                    <a class="nav-link {% if title == 'Home' %} active {% endif %}" href="{{ url_for('index') }}">Home</a>
+                    <a class="nav-link {% if title == 'Messages' %} active {% endif %}" href="{{ url_for('messages') }}">Messages</a>
+                    <a class="nav-link {% if title == 'Subscribers' %} active {% endif %}" href="{{ url_for('subscribers') }}">Subscribers</a>
+                    <a class="nav-link {% if title == 'Schedules' %} active {% endif %}" href="{{ url_for('schedules') }}">Schedules</a>
+                    <a class="nav-link {% if title == 'Sites' %} active {% endif %}" href="{{ url_for('sites') }}">Sites</a>
+                    {% set errors_count = open_errors_count() %}
+                    <a class="nav-link {% if title == 'Errors' %} active {% endif %}" href="{{ url_for('errors') }}" title="Open errors of the sendings, the scheduler and the API">Errors
+                        {% if errors_count %}<span class="badge rounded-pill bg-danger">{{ errors_count }}</span>{% endif %}</a>
+                </div>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link {% if title == 'API tokens' %} active {% endif %}" href="{{ url_for('api_tokens') }}">API tokens</a>
+                    <a class="nav-link {% if title == 'IP blacklist' %} active {% endif %}" href="{{ url_for('ip_blacklist') }}">IP blacklist</a>
+                    <a class="nav-link {% if title == 'Change Password' %} active {% endif %}" href="{{ url_for('change_password') }}">Change password</a>
+                    <form method="POST" action="{{ url_for('logout') }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                        <button class="nav-link btn btn-link" type="submit">Logout</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </nav>
+</header>

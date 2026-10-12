@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+<main class="dashboard">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning-subtle"><h3 class="h5 mb-0">Database not available</h3></div>
+                    <div class="card-body">
+                        <p>The database doesn't answer right now (unreachable, too slow or busy).</p>
+                        <p class="mb-0">Try again in a few seconds: <a href="javascript:location.reload()">reload the page</a>.
+                            If it goes on, check MariaDB and <code>log/app.log</code>.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+{% include 'footer.html' %}
+</body>

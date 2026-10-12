@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+
+    {% if notice %}
+        <div class="alert alert-success">{{ notice }}</div>
+    {% endif %}
+
+    <section>
+        <div class="card">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h3 class="h5 mb-0" data-refresh-box="title">Errors <span class="text-muted small">{{ paginate.total_records }} {{ statuses[filters.status]|lower if filters.status != 'all' else '' }}</span></h3>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    {% with refresh_key = 'errors' %}{% include 'refresh_control.html' %}{% endwith %}
+                    <div class="d-flex flex-wrap gap-2" data-refresh-box="phases">
+                    {% for key, label in PHASES.items() %}
+                        <a class="btn btn-sm {{ 'btn-dark' if filters.phase == key and filters.status == 'open' else 'btn-outline-secondary' }}"
+                           href="{{ url_for('errors', phase=key) }}">{{ label }} <span class="badge {{ PHASE_BADGES[key] }}">{{ open_by_phase.get(key, 0) }}</span></a>
+                    {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-body border-bottom small text-muted">
+                The errors of the sendings to the push services (Push), the scheduler, the API and the web app{% if current_site() %} of {{ current_site().name }}{% endif %}.
+                The counters are the open errors. A sending with some failures is only in the log: here it is an error when nothing was delivered.
+                Errors older than {{ retention_days }} days are deleted automatically (ERROR_LOG_RETENTION_DAYS);
+                the complete logs are in <code>log/</code>.
+            </div>
+
+            <!-- Filters -->
+            <form class="card-body border-bottom" method="GET" action="{{ url_for('errors') }}">
+                <div class="row g-2 align-items-end">
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="phase">Phase{{ info("Where the error happened: Push (sending to the push services), Scheduler (slots), API, App (console).") }}</label>
+                        <select class="form-select form-select-sm" id="phase" name="phase">
+                            <option value="">All</option>
+                            {% for key, label in PHASES.items() %}
+                                <option value="{{ key }}" {% if filters.phase == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="status">Status{{ info("Open: to look at. Resolved: marked by you (Clear). All: both.") }}</label>
+                        <select class="form-select form-select-sm" id="status" name="status">
+                            {% for key, label in statuses.items() %}
+                                <option value="{{ key }}" {% if filters.status == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="message_id">Message{{ info("Only the errors of this message (its id, in the url of its page).") }}</label>
+                        <input class="form-control form-control-sm" type="number" min="1" id="message_id" name="message_id" value="{{ filters.message or '' }}">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1" for="q">Text{{ info("Text in the error, in the url or in the source (logger), e.g. 403 or fcm.googleapis.com.") }}</label>
+                        <input class="form-control form-control-sm" type="search" id="q" name="q" value="{{ filters.q }}" placeholder="Message, url or source">
+                    </div>
+                    <div class="col-6 col-md-1">
+                        <label class="form-label small mb-1" for="records">Per page{{ info("Errors per page.") }}</label>
+                        <select class="form-select form-select-sm" id="records" name="records">
+                            {% for n in PER_PAGE_CHOICES %}
+                                <option value="{{ n }}" {% if paginate.records_per_page == n %}selected{% endif %}>{{ n }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2 d-flex gap-2">
+                        <button class="btn btn-sm btn-primary w-100" type="submit">Filter</button>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('errors') }}" title="Remove the filters">&times;</a>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Bulk actions: the filters of the page are sent with the form -->
+            <div class="card-body border-bottom d-flex flex-wrap gap-2">
+                <form method="POST" action="{{ url_for('errors_resolve') }}"
+                      onsubmit='return confirm("Mark as resolved all the open errors matching the filters?");'>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                    {% for key in ('phase', 'q') %}<input type="hidden" name="{{ key }}" value="{{ filters[key] or '' }}">{% endfor %}<input type="hidden" name="message_id" value="{{ filters.message or '' }}">
+                    <input type="hidden" name="status" value="{{ filters.status }}">
+                    <button class="btn btn-sm btn-outline-success" type="submit">Resolve all the open errors shown by the filters</button>
+                </form>
+                <form method="POST" action="{{ url_for('errors_delete_resolved') }}"
+                      onsubmit='return confirm("Delete all the resolved errors (of every phase)?");'>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                    {% for key in ('phase', 'q') %}<input type="hidden" name="{{ key }}" value="{{ filters[key] or '' }}">{% endfor %}<input type="hidden" name="message_id" value="{{ filters.message or '' }}">
+                    <input type="hidden" name="status" value="{{ filters.status }}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete the resolved errors</button>
+                </form>
+            </div>
+
+            <div data-refresh-box="list">
+            {% include 'pagination.html' %}
+
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th scope="col">Time</th>
+                        <th scope="col">Phase</th>
+                        <th scope="col">Source</th>
+                        <th scope="col">Site / message</th>
+                        <th scope="col">Error</th>
+                        <th scope="col"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for e in errors %}
+                        <tr class="{{ 'text-muted' if e.resolved }}">
+                            <td class="text-nowrap small">{{ e.created_at }}</td>
+                            <td><span class="badge {{ PHASE_BADGES.get(e.phase, 'bg-secondary') }}">{{ PHASES.get(e.phase, e.phase) }}</span></td>
+                            <td class="small font-monospace">{{ e.source }}</td>
+                            <td class="small text-nowrap">
+                                {{ e.site_name or '' }}
+                                {% if e.message_id %}<br><a href="{{ url_for('message_edit', message_id=e.message_id) }}">message {{ e.message_id }}</a>{% endif %}
+                            </td>
+                            <td class="small" style="max-width: 40rem;">
+                                <div class="text-break">{{ e.message }}</div>
+                                {% if e.url %}<div class="text-break"><a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.url }}</a></div>{% endif %}
+                                {% if e.traceback %}
+                                    <details id="traceback-{{ e.id }}">
+                                        <summary class="text-muted">Traceback</summary>
+                                        <pre class="small bg-light border p-2 mb-0" style="max-height: 24rem; overflow: auto; white-space: pre-wrap;">{{ e.traceback }}</pre>
+                                    </details>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <!-- the error as plain text, for the button Copy -->
+                                <textarea class="d-none" id="error-text-{{ e.id }}" readonly>
+Error {{ e.id }} - {{ e.created_at }} - {{ PHASES.get(e.phase, e.phase) }}{{ ' (resolved)' if e.resolved }}
+Source: {{ e.source }}
+{% if e.site_name %}Site: {{ e.site_name }}
+{% endif %}{% if e.message_id %}Message: {{ e.message_id }}
+{% endif %}Error: {{ e.message }}
+{% if e.url %}URL: {{ e.url }}
+{% endif %}{% if e.traceback %}Traceback:
+{{ e.traceback }}
+{% endif %}</textarea>
+                                <button class="btn btn-sm btn-outline-primary copy-error" type="button" data-error="{{ e.id }}"
+                                        title="Copy the error as text">Copy</button>
+                                <form method="POST" action="{{ url_for('error_resolve', error_id=e.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                    {% for key in ('phase', 'q', 'status') %}<input type="hidden" name="{{ key }}" value="{{ filters[key] or '' }}">{% endfor %}<input type="hidden" name="message_id" value="{{ filters.message or '' }}">
+                                    {% if e.resolved %}
+                                        <input type="hidden" name="resolved" value="0">
+                                        <button class="btn btn-sm btn-outline-secondary" type="submit">Reopen</button>
+                                    {% else %}
+                                        <input type="hidden" name="resolved" value="1">
+                                        <button class="btn btn-sm btn-outline-success" type="submit">Clear</button>
+                                    {% endif %}
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="6" class="text-muted p-4 text-center">No error</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% include 'pagination.html' %}
+            </div>
+        </div>
+    </section>
+
+</main>
+<script>
+    // Copy of an error as plain text: navigator.clipboard exists only on https and localhost (a console in http on
+    // a domain uses the old execCommand)
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+        var area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        var copied = document.execCommand('copy');
+        document.body.removeChild(area);
+        return copied ? Promise.resolve() : Promise.reject();
+    }
+    // one listener on the page: the rows are replaced by the automatic refresh
+    document.addEventListener('click', function (event) {
+        var button = event.target.closest('.copy-error');
+        if (!button) return;
+        var text = document.getElementById('error-text-' + button.dataset.error).value;
+        copyText(text).then(function () {
+            button.textContent = 'Copied';
+        }, function () {
+            button.textContent = 'Not copied';
+        });
+        setTimeout(function () { button.textContent = 'Copy'; }, 2000);
+    });
+</script>
+{% include 'footer.html' %}
+</body>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+    {% set site = current_site() %}
+    {% set queue = filters.status == 'queued' %}
+
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% elif message %}
+        <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+
+    <section>
+        <div class="card">
+            <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h3 class="h5 mb-0">Messages {% if site %}<span class="text-muted small">{{ site.name }}</span>{% endif %}</h3>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    {% with refresh_key = 'messages' %}{% include 'refresh_control.html' %}{% endwith %}
+                    <a class="btn btn-sm btn-success" href="{{ url_for('message_new') }}">New message</a>
+                </div>
+            </div>
+
+            <div class="card-body border-bottom d-flex flex-wrap justify-content-between align-items-end gap-2">
+                <ul class="nav nav-pills" data-refresh-box="tabs">
+                    {% for key, label in MESSAGE_STATUSES.items() %}
+                        {% if key != 'sending' or counts.sending %}
+                            <li class="nav-item">
+                                <a class="nav-link py-1 {{ 'active' if filters.status == key }}" href="{{ url_for('messages', status=key, q=filters.q or None) }}">
+                                    {{ label }} <span class="badge {{ 'bg-light text-dark' if filters.status == key else MESSAGE_BADGES[key] }}">{{ counts[key] }}</span></a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+                <form class="d-flex gap-2" method="GET" action="{{ url_for('messages') }}">
+                    <input type="hidden" name="status" value="{{ filters.status or '' }}">
+                    <input class="form-control form-control-sm" type="search" name="q" value="{{ filters.q }}" placeholder="Title or text" aria-label="Search">
+                    <span class="align-self-center">{{ info("Searches in the title and in the options (text, links) of the messages of the tab.") }}</span>
+                    <button class="btn btn-sm btn-primary" type="submit">Search</button>
+                </form>
+            </div>
+
+            {% if queue %}
+                <div class="card-body border-bottom small text-muted">
+                    The queue in sending order: at every slot of the schedule the first message is sent to a share of the
+                    subscribers ({% if site %}<a href="{{ url_for('schedules') }}">schedule of {{ site.name }}</a>{% else %}see Schedules{% endif %}).
+                    A message with <i>Send after</i> waits for its time, the next ones go ahead.
+                    <b>Send now</b> sends it at once to all the subscribers of the site.
+                </div>
+            {% endif %}
+
+            <div data-refresh-box="list">
+            {% include 'pagination.html' %}
+
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        {% if queue %}<th scope="col" class="text-center">#</th>{% endif %}
+                        <th scope="col">Message</th>
+                        {% if not site %}<th scope="col">Site</th>{% endif %}
+                        <th scope="col">{{ 'Created' if queue else 'Sent' }}</th>
+                        {% if not queue %}
+                            <th scope="col" class="text-end" title="delivered / sent">Delivered</th>
+                            <th scope="col" class="text-end" title="clicks (out of delivered)">Clicks</th>
+                        {% endif %}
+                        <th scope="col"></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for m in messages %}
+                        {% set o = m.options_dict %}
+                        <tr>
+                            {% if queue %}
+                                <td class="text-center text-nowrap">
+                                    <div class="text-muted small mb-1">{{ paginate.offset + loop.index }}</div>
+                                    <form method="POST" action="{{ url_for('message_action', message_id=m.id) }}" class="btn-group btn-group-sm queue-move">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                        <input type="hidden" name="next" value="{{ back_url() }}">
+                                        <button class="btn btn-outline-secondary" name="action" value="top" title="First of the queue">&#8607;</button>
+                                        <button class="btn btn-outline-secondary" name="action" value="up" title="Up">&uarr;</button>
+                                        <button class="btn btn-outline-secondary" name="action" value="down" title="Down">&darr;</button>
+                                    </form>
+                                </td>
+                            {% endif %}
+                            <td class="message-cell">
+                                <div class="d-flex gap-2">
+                                    {% if o.icon or o.image %}<img class="message-thumb" src="{{ o.image or o.icon }}" alt="" loading="lazy">{% endif %}
+                                    <div class="min-w-0">
+                                        <a class="fw-semibold" href="{{ url_for('message_edit', message_id=m.id) }}">{{ m.title }}</a>
+                                        {% if not queue %}<span class="badge {{ MESSAGE_BADGES[m.status] }}">{{ MESSAGE_STATUSES[m.status] }}</span>{% endif %}
+                                        {% if o.body %}<div class="text-muted small text-truncate-2">{{ o.body }}</div>{% endif %}
+                                        {% if o.data and o.data.url %}<div class="small text-truncate"><a href="{{ o.data.url }}" target="_blank" rel="noopener" class="link-secondary">{{ o.data.url }}</a></div>{% endif %}
+                                        {% if m.send_after and m.status == 'queued' %}<div class="small text-warning-emphasis">Not before {{ m.send_after.strftime('%d/%m/%Y %H:%M') }}</div>{% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            {% if not site %}<td class="small">{{ m.site_name }}</td>{% endif %}
+                            <td class="small text-nowrap">
+                                {% if queue %}
+                                    {{ m.created_at.strftime('%d/%m/%Y %H:%M') }}{% if m.created_by %}<br><span class="text-muted">by {{ m.created_by }}</span>{% endif %}
+                                {% else %}
+                                    {{ m.sent_at.strftime('%d/%m/%Y %H:%M') if m.sent_at else '-' }}
+                                {% endif %}
+                            </td>
+                            {% if not queue %}
+                                <td class="text-end small text-nowrap">
+                                    {% if m.total %}{{ m.success }}/{{ m.total }} <span class="text-muted">{{ '%.0f%%'|format(m.success / m.total * 100) }}</span>{% else %}-{% endif %}
+                                </td>
+                                <td class="text-end small text-nowrap">
+                                    {{ m.clicks }} {% if m.success %}<span class="text-muted">{{ '%.1f%%'|format(m.clicks / m.success * 100) }}</span>{% endif %}
+                                </td>
+                            {% endif %}
+                            <td class="text-end text-nowrap">
+                                {% if m.status == 'queued' %}
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('message_edit', message_id=m.id) }}">Edit</a>
+                                    <form method="POST" action="{{ url_for('message_action', message_id=m.id) }}" class="d-inline"
+                                          onsubmit='return confirm({{ ("Send \"" ~ m.title ~ "\" now to all the subscribers of " ~ m.site_name ~ "?")|tojson }});'>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                        <input type="hidden" name="next" value="{{ back_url() }}">
+                                        <button class="btn btn-sm btn-outline-success" name="action" value="send-now">Send now</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('message_action', message_id=m.id) }}" class="d-inline"
+                                          onsubmit='return confirm("Cancel this message? It leaves the queue.");'>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                        <input type="hidden" name="next" value="{{ back_url() }}">
+                                        <button class="btn btn-sm btn-outline-danger" name="action" value="cancel">Cancel</button>
+                                    </form>
+                                {% else %}
+                                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('message_new', copy=m.id) }}" title="A new message with the same content">Duplicate</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="text-muted p-4 text-center">
+                            {% if queue %}The queue is empty: <a href="{{ url_for('message_new') }}">add a message</a> or queue them with the API (page API tokens).
+                            {% else %}No message.{% endif %}
+                        </td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% include 'pagination.html' %}
+            </div>
+        </div>
+    </section>
+</main>
+{% include 'footer.html' %}
+</body>

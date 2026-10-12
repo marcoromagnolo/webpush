@@ -1,0 +1,32 @@
+{# Pagination: needs paginate, current_route and args (query parameters to keep) #}
+<nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 my-2" aria-label="Pages">
+    <div class="text-muted small">
+        {% if paginate.total_records %}
+            {{ paginate.first_record }}–{{ paginate.last_record }} of {{ paginate.total_records }} {{ records_name|default('articles') }}
+        {% else %}
+            No {{ records_name|default('articles')|trim('s') }}
+        {% endif %}
+    </div>
+    {% if paginate.total_pages > 1 %}
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if paginate.current == 1 %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for(current_route, current=1, **args) }}" title="First page">&laquo;</a>
+            </li>
+            <li class="page-item {% if paginate.current == 1 %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for(current_route, current=paginate.current - 1, **args) }}" title="Previous page">&lsaquo;</a>
+            </li>
+            {% for n in paginate.range %}
+                <li class="page-item {% if n == paginate.current %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for(current_route, current=n, **args) }}"
+                       {% if n == paginate.current %}aria-current="page"{% endif %}>{{ n }}</a>
+                </li>
+            {% endfor %}
+            <li class="page-item {% if paginate.current == paginate.total_pages %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for(current_route, current=paginate.current + 1, **args) }}" title="Next page">&rsaquo;</a>
+            </li>
+            <li class="page-item {% if paginate.current == paginate.total_pages %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for(current_route, current=paginate.total_pages, **args) }}" title="Last page">&raquo;</a>
+            </li>
+        </ul>
+    {% endif %}
+</nav>

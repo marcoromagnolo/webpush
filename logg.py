@@ -16,6 +16,10 @@ def create_logger(name):
     logger = logging.getLogger(name)
     logger.setLevel(app_log_level)
 
+    # Already configured by another module: don't add a second handler (duplicated lines)
+    if logger.handlers:
+        return logger
+
     # Create FileHandler to log to file
     file_handler = RotatingFileHandler(app_log_filepath, maxBytes=50*1024*1024, backupCount=5, encoding='utf-8')
     # file_handler = logging.FileHandler(app_log_filepath)

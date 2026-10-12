@@ -1,0 +1,32 @@
+# Secrets: passed at run time with --env-file
+**/.env
+
+# Local environment and runtime data (mounted as volumes)
+venv/
+.venv/
+log/
+
+# VAPID keys of the single site version: imported in the database (README.md > Upgrade)
+*.pem
+private_key.txt
+public_key.txt
+*.pid
+
+# Host-only files: database setup scripts, tests
+sql/
+tests/
+requirements-dev.txt
+
+**/__pycache__
+**/*.py[cod]
+**/.git
+**/.gitignore
+**/.dockerignore
+**/.idea
+**/.vscode
+**/Dockerfile*
+README*.md
+
+# Host-only scripts: start / stop the container
+docker-start.sh
+docker-stop.sh

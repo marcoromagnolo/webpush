@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+    {% set editable = not message or message.status == 'queued' %}
+
+    {% if error or action_error %}
+        <div class="alert alert-danger">{{ error or action_error }}</div>
+    {% elif notice %}
+        <div class="alert alert-success">{{ notice }}</div>
+    {% endif %}
+
+    <div class="row g-3">
+        <!-- Form -->
+        <section class="col-lg-7 mb-0">
+            <div class="card">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h3 class="h5 mb-0">
+                        {% if message %}Message {{ message.id }} <span class="badge {{ MESSAGE_BADGES[message.status] }}">{{ MESSAGE_STATUSES[message.status] }}</span>
+                        {% else %}New message{% endif %}
+                    </h3>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('messages', status=message.status if message else 'queued') }}">Back to the messages</a>
+                </div>
+                <form class="card-body" method="POST" id="message-form"
+                      action="{{ url_for('message_edit', message_id=message.id) if message else url_for('message_new') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                    <fieldset {% if not editable %}disabled{% endif %}>
+                        {% if not editable %}
+                            <p class="text-muted small">The message is {{ MESSAGE_STATUSES[message.status]|lower }}: it can't be changed. <b>Duplicate</b> it to send it again.</p>
+                        {% endif %}
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="site_id">Site{{ info("Site whose subscribers receive the message: it goes in the queue of that site.") }}</label>
+                                {% if message %}
+                                    <input class="form-control" type="text" value="{{ message.site_name }}" disabled>
+                                {% else %}
+                                    <select class="form-select" id="site_id" name="site_id" required>
+                                        {% if not site %}<option value="">Choose the site</option>{% endif %}
+                                        {% for s in sites %}
+                                            <option value="{{ s.id }}" data-icon="{{ s.default_icon or '' }}" data-badge="{{ s.default_badge or '' }}"
+                                                    data-host="{{ s.url.split('/')[2] if s.url.count('/') >= 2 else s.url }}"
+                                                    {% if site and site.id == s.id %}selected{% endif %}>{{ s.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="send_after">Send after <span class="text-muted small">(optional)</span>{{ info("Optional: the message is not sent before this date and time (local time of the server). Until then the next messages of the queue go ahead.") }}</label>
+                                <input class="form-control" type="datetime-local" id="send_after" name="send_after" value="{{ form.send_after or '' }}">
+                                <div class="form-text">Not sent before this time: the next messages of the queue go ahead.</div>
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label" for="title">Title{{ info("First line of the notification, in bold. Short: the systems cut it at about 50 characters. Max 255.") }}</label>
+                                <input class="form-control" type="text" id="title" name="title" maxlength="255" required value="{{ form.title or '' }}"
+                                       placeholder="Title of the notification" autofocus>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="body">Text{{ info("Text under the title: 1-2 short sentences. The systems show 2-4 lines.") }}</label>
+                                <textarea class="form-control" id="body" name="body" rows="3" maxlength="1000"
+                                          placeholder="Shown under the title: 1-2 short sentences">{{ form.body or '' }}</textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="url">Link{{ info("Page opened by a click on the notification (data.url), e.g. the article. Without it the click only closes the notification.") }}</label>
+                                <input class="form-control" type="url" id="url" name="url" value="{{ form.url or '' }}" placeholder="https://... opened by a click on the notification">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="image">Image <span class="text-muted small">(large, Chrome / Edge)</span>{{ info("Large image under the text (https url, about 1350x675, ratio 2:1). Shown by Chrome and Edge on Windows and Android, ignored by Safari and Firefox.") }}</label>
+                                <input class="form-control" type="url" id="image" name="image" value="{{ form.image or '' }}" placeholder="https://...">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="icon">Icon <span class="text-muted small">(default of the site if empty)</span>{{ info("Small square image next to the text (https url, 192x192). Empty: the default icon of the site.") }}</label>
+                                <input class="form-control" type="url" id="icon" name="icon" value="{{ form.icon or '' }}" placeholder="https://...">
+                            </div>
+                        </div>
+
+                        <details class="mt-3" {% if form.action1_title or form.tag or form.extra or form.badge or form.requireInteraction or form.silent %}open{% endif %}>
+                            <summary class="fw-semibold">More options</summary>
+                            <div class="row g-3 mt-1">
+                                {% for n in (1, 2) %}
+                                    <div class="col-md-4">
+                                        <label class="form-label small" for="action{{ n }}_title">Button {{ n }}{{ info("Text of a button under the notification (e.g. Read, Watch). Shown by Chrome and Edge, max 2 buttons.") }}</label>
+                                        <input class="form-control form-control-sm" type="text" id="action{{ n }}_title" name="action{{ n }}_title" maxlength="40"
+                                               value="{{ form['action' ~ n ~ '_title'] or '' }}" placeholder="Read more">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label small" for="action{{ n }}_url">Link of button {{ n }}{{ info("Page opened by this button. Empty: the link of the message.") }}</label>
+                                        <input class="form-control form-control-sm" type="url" id="action{{ n }}_url" name="action{{ n }}_url"
+                                               value="{{ form['action' ~ n ~ '_url'] or '' }}" placeholder="https://... (the link of the message if empty)">
+                                    </div>
+                                {% endfor %}
+                                <div class="col-md-6">
+                                    <label class="form-label small" for="badge">Badge <span class="text-muted">(monochrome, Android)</span>{{ info("Small monochrome image (PNG with transparency, 96x96) shown by Android in the status bar. Empty: the default badge of the site.") }}</label>
+                                    <input class="form-control form-control-sm" type="url" id="badge" name="badge" value="{{ form.badge or '' }}" placeholder="default of the site if empty">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small" for="tag">Tag{{ info("Notifications with the same tag replace each other instead of piling up (e.g. the same article updated, or one tag per category).") }}</label>
+                                    <input class="form-control form-control-sm" type="text" id="tag" name="tag" maxlength="100" value="{{ form.tag or '' }}"
+                                           placeholder="same tag: replaces the previous notification">
+                                </div>
+                                <div class="col-12 d-flex flex-wrap gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="requireInteraction" name="requireInteraction" {% if form.requireInteraction %}checked{% endif %}>
+                                        <label class="form-check-label small" for="requireInteraction">Stays until the user closes it{{ info("The notification stays on the screen until the user clicks or closes it, instead of disappearing after a few seconds (Chrome and Edge on the desktop).") }}</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="renotify" name="renotify" {% if form.renotify %}checked{% endif %}>
+                                        <label class="form-check-label small" for="renotify">Alert again with the same tag{{ info("With a tag: when it replaces a notification with the same tag, sound and vibration again. Without it the replacement is silent.") }}</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="silent" name="silent" {% if form.silent %}checked{% endif %}>
+                                        <label class="form-check-label small" for="silent">Silent{{ info("No sound and no vibration.") }}</label>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small" for="extra">Extra options <span class="text-muted">(JSON of the
+                                        <a href="https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification#options" target="_blank" rel="noopener">Notification options</a>,
+                                        e.g. {"vibrate": [200, 100, 200], "data": {"campaign": "x"}})</span>{{ info("Other options of showNotification as JSON object, merged with the fields above: e.g. vibrate, lang, dir, timestamp, data (extra data for the service worker). The fields of the form win.") }}</label>
+                                    <textarea class="form-control form-control-sm font-monospace" id="extra" name="extra" rows="3">{{ form.extra or '' }}</textarea>
+                                </div>
+                            </div>
+                        </details>
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button class="btn btn-primary" type="submit">{{ 'Save' if message else 'Add to the queue' }}</button>
+                            <a class="btn btn-outline-secondary" href="{{ url_for('messages') }}">Cancel</a>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+        </section>
+
+        <!-- Preview and sendings -->
+        <div class="col-lg-5 d-flex flex-column gap-3">
+            <section class="mb-0 sticky-lg-top" style="top: 1rem;">
+                <div class="card">
+                    <div class="card-header"><h3 class="h6 mb-0">Preview <span class="text-muted small">similar to Chrome on the desktop</span></h3></div>
+                    <div class="card-body bg-body-tertiary">
+                        <div class="notification-preview" id="preview"
+                             data-icon="{{ preview_site.default_icon or '' if preview_site else '' }}"
+                             data-host="{{ preview_site.url.split('/')[2] if preview_site and preview_site.url.count('/') >= 2 else '' }}">
+                            <div class="np-header">
+                                <span class="np-app">Chrome</span> &middot; <span class="np-host" id="np-host"></span>
+                            </div>
+                            <div class="np-main">
+                                <div class="np-text">
+                                    <div class="np-title" id="np-title"></div>
+                                    <div class="np-body" id="np-body"></div>
+                                </div>
+                                <img class="np-icon" id="np-icon" alt="">
+                            </div>
+                            <img class="np-image" id="np-image" alt="">
+                            <div class="np-actions" id="np-actions"></div>
+                        </div>
+                        <p class="text-muted small mt-2 mb-0">Every browser and system shows it in its own way: Safari and Firefox don't show the image,
+                            Android shows the badge in the status bar. Send a test to see it for real.</p>
+                    </div>
+                </div>
+            </section>
+
+            {% if message %}
+                <section class="mb-0">
+                    <div class="card">
+                        <div class="card-header"><h3 class="h6 mb-0">Sending</h3></div>
+                        <div class="card-body">
+                            <dl class="row small info mb-2">
+                                <dt class="col-5">Created</dt>
+                                <dd class="col-7">{{ message.created_at.strftime('%d/%m/%Y %H:%M') }}{{ ' by ' ~ message.created_by if message.created_by }}</dd>
+                                {% if message.started_at %}<dt class="col-5">Started</dt><dd class="col-7">{{ message.started_at.strftime('%d/%m/%Y %H:%M') }}</dd>{% endif %}
+                                {% if message.sent_at %}<dt class="col-5">Ended</dt><dd class="col-7">{{ message.sent_at.strftime('%d/%m/%Y %H:%M') }}</dd>{% endif %}
+                                {% if message.total %}
+                                    <dt class="col-5">Delivered</dt><dd class="col-7">{{ message.success }} of {{ message.total }} ({{ '%.0f%%'|format(message.success / message.total * 100) }})</dd>
+                                    <dt class="col-5">Clicks</dt><dd class="col-7">{{ message.clicks }}{% if message.success %} ({{ '%.1f%%'|format(message.clicks / message.success * 100) }}){% endif %}</dd>
+                                {% endif %}
+                            </dl>
+                            <div class="d-flex flex-wrap gap-2">
+                                <form method="POST" action="{{ url_for('message_action', message_id=message.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                    <input type="hidden" name="next" value="{{ back_url() }}">
+                                    <button class="btn btn-sm btn-outline-primary" name="action" value="send-test"
+                                            {% if not test_subscribers %}disabled title="No test browser: Sites > the site > Integration"{% endif %}>
+                                        Send test ({{ test_subscribers|length }} browser{{ 's' if test_subscribers|length != 1 }})</button>
+                                </form>
+                                {% if message.status == 'queued' %}
+                                    <form method="POST" action="{{ url_for('message_action', message_id=message.id) }}"
+                                          onsubmit='return confirm({{ ("Send now to all the subscribers of " ~ message.site_name ~ "?")|tojson }});'>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                        <input type="hidden" name="next" value="{{ back_url() }}">
+                                        <button class="btn btn-sm btn-outline-success" name="action" value="send-now">Send now to all</button>
+                                    </form>
+                                    <form method="POST" action="{{ url_for('message_action', message_id=message.id) }}"
+                                          onsubmit='return confirm("Cancel this message? It leaves the queue.");'>
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                        <input type="hidden" name="next" value="{{ url_for('messages') }}">
+                                        <button class="btn btn-sm btn-outline-danger" name="action" value="cancel">Cancel message</button>
+                                    </form>
+                                {% endif %}
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('message_new', copy=message.id) }}">Duplicate</a>
+                            </div>
+                            {% if not test_subscribers %}
+                                <p class="text-muted small mt-2 mb-0">To try a message before sending it, add this browser as test browser:
+                                    <a href="{{ url_for('site_edit', site_id=message.site_id) }}#integration">Sites &gt; {{ message.site_name }} &gt; Integration</a>.</p>
+                            {% endif %}
+                        </div>
+                        {% if deliveries %}
+                            <div class="table-responsive border-top">
+                                <table class="table table-sm align-middle mb-0 small">
+                                    <thead>
+                                    <tr><th>Time</th><th>Kind</th><th class="text-end">Delivered</th><th class="text-end" title="subscription expired or revoked: removed">Gone</th><th class="text-end">Errors</th></tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for d in deliveries %}
+                                        <tr>
+                                            <td class="text-nowrap">{{ d.start_time.strftime('%d/%m %H:%M') }}</td>
+                                            <td>{% if d.kind == 'slot' %}slot {{ d.slot }}, partition {{ d.partition_index + 1 }}/{{ d.partitions }}{% elif d.kind == 'now' %}by hand, all{% else %}test{% endif %}
+                                                {% if not d.end_time %}<span class="badge bg-info text-dark">running</span>{% endif %}</td>
+                                            <td class="text-end">{{ d.success }}/{{ d.total }}</td>
+                                            <td class="text-end">{{ d.gone }}</td>
+                                            <td class="text-end {{ 'text-danger' if d.errors }}">
+                                                {% if d.errors %}<a class="link-danger" href="{{ url_for('errors', message_id=message.id, status='all') }}">{{ d.errors }}</a>{% else %}0{% endif %}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+    </div>
+</main>
+<script>
+    // Live preview of the notification
+    (function () {
+        var form = document.getElementById('message-form');
+        var preview = document.getElementById('preview');
+        var site = document.getElementById('site_id');
+        function value(name) {
+            var field = form.elements[name];
+            return field ? field.value.trim() : '';
+        }
+        function siteData(name) {
+            if (site && site.selectedOptions.length) return site.selectedOptions[0].dataset[name] || '';
+            return preview.dataset[name] || '';
+        }
+        function setImage(element, src) {
+            element.style.display = src ? '' : 'none';
+            if (src) element.src = src;
+        }
+        function render() {
+            document.getElementById('np-title').textContent = value('title') || 'Title of the notification';
+            document.getElementById('np-body').textContent = value('body');
+            var link = value('url');
+            var host = siteData('host');
+            try { if (link) host = new URL(link).host; } catch (e) {}
+            document.getElementById('np-host').textContent = host;
+            setImage(document.getElementById('np-icon'), value('icon') || siteData('icon'));
+            setImage(document.getElementById('np-image'), value('image'));
+            var actions = document.getElementById('np-actions');
+            actions.textContent = '';
+            [1, 2].forEach(function (n) {
+                var title = value('action' + n + '_title');
+                if (title) {
+                    var button = document.createElement('span');
+                    button.textContent = title;
+                    actions.appendChild(button);
+                }
+            });
+            actions.style.display = actions.children.length ? '' : 'none';
+        }
+        form.addEventListener('input', render);
+        if (site) site.addEventListener('change', render);
+        render();
+    })();
+</script>
+{% include 'footer.html' %}
+</body>

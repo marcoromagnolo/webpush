@@ -1,0 +1,82 @@
+
+<footer>
+    <p>&copy; {{ current_year }} WebPush di Marco Romagnolo &lt;<a href="mailto:romagnolomarco@gmail.com">romagnolomarco@gmail.com</a>&gt;</p>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<script>
+    // Tooltips of the info icons of the forms (info() in app.py)
+    function initTooltips(root) {
+        root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+            new bootstrap.Tooltip(element, {trigger: 'hover focus', container: 'body'});
+        });
+    }
+    initTooltips(document);
+
+    // Automatic refresh (refresh_control.html): every N seconds the page is reloaded in the background and the parts
+    // marked data-refresh-box are replaced; filters, page and the rest stay as they are. Default REFRESH_SECONDS,
+    // the choice of each page is kept by the browser.
+    (function () {
+        var select = document.getElementById('refresh-seconds');
+        if (!select) return;
+        var stamp = document.getElementById('refreshed-at');
+        var key = 'refresh_seconds_' + select.dataset.refreshKey;
+        var seconds = parseInt(select.dataset.refreshDefault, 10);
+        try { var saved = localStorage.getItem(key); if (saved !== null) seconds = parseInt(saved, 10); } catch (e) {}
+        if (isNaN(seconds) || seconds < 0) seconds = 0;
+        if (!select.querySelector('option[value="' + seconds + '"]')) {
+            select.insertAdjacentHTML('beforeend', '<option value="' + seconds + '">' + seconds + ' s</option>');
+        }
+        select.value = String(seconds);
+        var timer = null, busy = false;
+
+        // something in progress in a refreshed part (typing, a menu open): the refresh waits for the next turn
+        function interacting() {
+            var active = document.activeElement;
+            if (active && active.closest('[data-refresh-box]') && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName)) return true;
+            return !!document.querySelector('[data-refresh-box] .dropdown-menu.show');
+        }
+
+        function refresh() {
+            if (busy || document.hidden || interacting()) return;
+            busy = true;
+            fetch(location.href, {credentials: 'same-origin', cache: 'no-store', headers: {'X-Requested-With': 'fetch'}})
+                .then(function (r) { if (!r.ok || r.redirected) throw new Error(r.status); return r.text(); })
+                .then(function (html) {
+                    var fresh = new DOMParser().parseFromString(html, 'text/html');
+                    document.querySelectorAll('[data-refresh-box]').forEach(function (box) {
+                        var part = fresh.querySelector('[data-refresh-box="' + box.dataset.refreshBox + '"]');
+                        if (!part) return;
+                        // the <details> with an id (e.g. a traceback) stay open
+                        var open = Array.prototype.map.call(box.querySelectorAll('details[id][open]'), function (d) { return d.id; });
+                        box.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+                            var tip = bootstrap.Tooltip.getInstance(element);
+                            if (tip) tip.dispose();
+                        });
+                        box.innerHTML = part.innerHTML;
+                        open.forEach(function (id) { var d = document.getElementById(id); if (d) d.open = true; });
+                        initTooltips(box);
+                    });
+                    stamp.textContent = 'updated ' + new Date().toLocaleTimeString();
+                })
+                .catch(function () { stamp.textContent = 'not updated (login expired?)'; })
+                .finally(function () { busy = false; });
+        }
+
+        function schedule() {
+            if (timer) clearInterval(timer);
+            timer = seconds > 0 ? setInterval(refresh, seconds * 1000) : null;
+            stamp.textContent = seconds > 0 ? '' : 'refresh off';
+        }
+
+        select.addEventListener('change', function () {
+            seconds = parseInt(select.value, 10);
+            try { localStorage.setItem(key, String(seconds)); } catch (e) {}
+            schedule();
+            if (seconds > 0) refresh();
+        });
+        // back on the tab after a while: refreshed at once
+        document.addEventListener('visibilitychange', function () { if (!document.hidden && seconds > 0) refresh(); });
+        schedule();
+    })();
+</script>

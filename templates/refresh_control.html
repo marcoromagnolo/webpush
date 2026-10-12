@@ -1,0 +1,10 @@
+{# Automatic refresh of the parts of the page marked data-refresh-box (script in footer.html): refresh_key names the
+   choice kept by the browser, the default is REFRESH_SECONDS #}
+<div class="d-flex align-items-center gap-2 small text-muted">
+    <label for="refresh-seconds" class="mb-0">Refresh</label>
+    <select id="refresh-seconds" class="form-select form-select-sm w-auto" data-refresh-key="{{ refresh_key }}"
+            data-refresh-default="{{ REFRESH_SECONDS }}" title="Automatic refresh of the page (off: never)">
+        {% for n in REFRESH_CHOICES %}<option value="{{ n }}">{{ n ~ ' s' if n else 'off' }}</option>{% endfor %}
+    </select>
+    <span id="refreshed-at"></span>
+</div>

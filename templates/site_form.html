@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% elif message %}
+        <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+
+    {% if site %}
+        <ul class="nav nav-tabs mb-3">
+            <li class="nav-item"><a class="nav-link" href="#settings">Settings</a></li>
+            <li class="nav-item"><a class="nav-link" href="#keys">Keys</a></li>
+            <li class="nav-item"><a class="nav-link" href="#integration">Integration</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('site_test_page', site_id=site.id) }}">Test page</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('select_site', site=site.code, next=url_for('schedules')) }}">Schedule</a></li>
+        </ul>
+    {% endif %}
+
+    <!-- Settings -->
+    <section id="settings">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="h5 mb-0">{{ site.name if site else 'New site' }}</h3>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sites') }}">Back to the sites</a>
+            </div>
+            <form class="card-body" method="POST" action="{{ url_for('site_edit', site_id=site.id) if site else url_for('site_new') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="name">Name{{ info("Name of the site in the console (menu, lists, statistics). Free text, e.g. My News.") }}</label>
+                        <input class="form-control" type="text" id="name" name="name" maxlength="100" required value="{{ form.name or '' }}" placeholder="My News">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="code">Code{{ info("Identifier of the site in the API urls (/api/v1/sites/<code>/...) and in the integration code (data-site). Lowercase letters, numbers and dash. It can't change after the creation: the code on the site would stop working.") }}</label>
+                        <input class="form-control font-monospace" type="text" id="code" name="code" maxlength="50" required
+                               pattern="[a-z0-9][a-z0-9\-]{1,49}" value="{{ form.code or '' }}" placeholder="mynews"
+                               {% if site %}readonly title="It is in the urls of the API used by the site: it can't change"{% endif %}>
+                        <div class="form-text">In the API urls: lowercase letters, numbers, dash.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="url">Url{{ info("Home page of the site, e.g. https://www.example.com. Its origin (scheme + host) is allowed to subscribe the browsers (CORS).") }}</label>
+                        <input class="form-control" type="url" id="url" name="url" maxlength="255" required value="{{ form.url or '' }}" placeholder="https://www.example.com">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="allowed_origins">Other allowed origins <span class="text-muted small">(optional)</span>{{ info("Other origins (scheme://host[:port]) whose pages can subscribe, one per line: e.g. https://example.com without www, or a mobile domain. The console (PUBLIC_URL) is always allowed, for its test page.") }}</label>
+                        <textarea class="form-control font-monospace small" id="allowed_origins" name="allowed_origins" rows="2"
+                                  placeholder="https://example.com&#10;https://m.example.com">{{ form.allowed_origins or '' }}</textarea>
+                        <div class="form-text">One per line. The browsers can subscribe only from the origin of the url and these.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="vapid_sub">Contact{{ info("Contact of the sender in the VAPID claims (sub), read only by the push services (Google, Mozilla, Apple, Microsoft) to contact you if there are problems. mailto:address or https url; Apple refuses a missing or fake one. Not shown to the visitors.") }}</label>
+                        <input class="form-control" type="text" id="vapid_sub" name="vapid_sub" maxlength="255" required value="{{ form.vapid_sub or '' }}"
+                               placeholder="mailto:admin@example.com">
+                        <div class="form-text">Sent to the push services (VAPID): <code>mailto:</code> address or https url.</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="messages_per_day">Messages per subscriber a day{{ info("How many notifications a subscriber receives in a day. With S slots in a day the subscribers are split in ceil(S / this) shares, one per slot in turn (see Schedules). From 1 to 24.") }}</label>
+                        <input class="form-control" type="number" min="1" max="24" id="messages_per_day" name="messages_per_day" required value="{{ form.messages_per_day }}">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="ttl_hours">Time to live (hours){{ info("How long a push service keeps a notification for a browser that is offline: after it, the notification is dropped. Short for news (e.g. 24), from 1 to 672 hours.") }}</label>
+                        <input class="form-control" type="number" min="1" max="672" id="ttl_hours" name="ttl_hours" required value="{{ form.ttl_hours }}">
+                        <div class="form-text">A browser offline longer doesn't receive it.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="default_icon">Default icon{{ info("Image shown next to the text of the notification when the message has no icon: square PNG, at least 192x192, https url (e.g. the logo of the site).") }}</label>
+                        <input class="form-control" type="url" id="default_icon" name="default_icon" value="{{ form.default_icon or '' }}" placeholder="https://.../icon.png">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="default_badge">Default badge{{ info("Small monochrome image (PNG with transparency, 96x96) shown by Android in the status bar when the message has no badge.") }}</label>
+                        <input class="form-control" type="url" id="default_badge" name="default_badge" value="{{ form.default_badge or '' }}" placeholder="https://.../badge.png">
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {% if form.enabled %}checked{% endif %}>
+                            <label class="form-check-label" for="enabled">Enabled <span class="text-muted small">(disabled: no sending, the public API answers 404)</span>{{ info("Disabled: the slots don't run, nothing is sent, the public API answers 404 (the browsers can't subscribe). The data are kept.") }}</label>
+                        </div>
+                        {% if not site %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="generate_keys" name="generate_keys" {% if form.generate_keys %}checked{% endif %}>
+                                <label class="form-check-label" for="generate_keys">Generate new VAPID keys <span class="text-muted small">(uncheck to import existing ones)</span>{{ info("Creates the VAPID key pair of the site: the browsers subscribe with the public key, the sendings are signed with the private one. Uncheck to import existing keys afterwards (Keys > Import).") }}</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="default_schedule" name="default_schedule" {% if form.default_schedule %}checked{% endif %}>
+                                <label class="form-check-label" for="default_schedule">Default schedule: every day, every hour 8:00-22:00{{ info("Creates the slots every day, every hour from 8:00 to 22:00 (15 a day). They can be changed in the page Schedules.") }}</label>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-4">
+                    <button class="btn btn-primary" type="submit">{{ 'Save' if site else 'Create site' }}</button>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('sites') }}">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </section>
+
+    {% if site %}
+        <!-- VAPID keys -->
+        <section id="keys">
+            <div class="card {{ 'border-danger' if not site.vapid_public_key }}">
+                <div class="card-header"><h3 class="h5 mb-0">VAPID keys</h3></div>
+                <div class="card-body">
+                    {% if key_error %}<div class="alert alert-danger">{{ key_error }}</div>{% endif %}
+                    {% if site.vapid_public_key %}
+                        <label class="form-label small" for="public-key">Public key (applicationServerKey){{ info("applicationServerKey of the site: webpush-client.js reads it from the API to subscribe the browsers. Public, it can be shown.") }}</label>
+                        <div class="input-group input-group-sm mb-2">
+                            <input class="form-control font-monospace" type="text" id="public-key" value="{{ site.vapid_public_key }}" readonly>
+                            <button class="btn btn-outline-secondary copy" type="button" data-target="public-key">Copy</button>
+                        </div>
+                        <p class="small text-muted">The browsers subscribe with this key: new keys make every subscription of the site
+                            stop working (the subscribers are removed at the next sendings and must subscribe again).</p>
+                    {% else %}
+                        <p class="text-danger">The site has no keys: nothing can be sent and the browsers can't subscribe.</p>
+                    {% endif %}
+                    <div class="row g-3">
+                        <form class="col-md-8" method="POST" action="{{ url_for('site_keys', site_id=site.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                            <input type="hidden" name="action" value="import">
+                            <div class="fw-semibold small mb-1">Import existing keys{{ info("Keys already used by the site (e.g. private_key.txt and public_key.txt of the single site version): the browsers already subscribed keep working. Base64url, as made by the openssl commands of the README.") }}</div>
+                            <label class="visually-hidden" for="private_key">Private key</label>
+                            <input class="form-control form-control-sm font-monospace mb-1" type="password" id="private_key" name="private_key" required autocomplete="off"
+                                   placeholder="private key: content of private_key.txt">
+                            <label class="visually-hidden" for="public_key">Public key</label>
+                            <input class="form-control form-control-sm font-monospace mb-1" type="text" id="public_key" name="public_key" autocomplete="off"
+                                   placeholder="public key: content of public_key.txt (optional, checked against the private one)">
+                            <button class="btn btn-sm btn-outline-primary" type="submit"
+                                    {% if site.vapid_public_key %}onclick='return confirm("Replace the keys of the site?");'{% endif %}>Import</button>
+                        </form>
+                        <form class="col-md-4" method="POST" action="{{ url_for('site_keys', site_id=site.id) }}"
+                              onsubmit='return confirm({{ ("Generate new keys? The browsers subscribed to " ~ site.name ~ " will stop receiving notifications until they subscribe again." if site.vapid_public_key else "Generate the keys of the site?")|tojson }});'>
+                            <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                            <input type="hidden" name="action" value="generate">
+                            <div class="fw-semibold small mb-1">New keys{{ info("A new key pair for the site. The browsers subscribed with the old keys stop receiving: they are removed at the next sendings and must subscribe again. Use it only for a new site or compromised keys.") }}</div>
+                            <button class="btn btn-sm {{ 'btn-outline-danger' if site.vapid_public_key else 'btn-success' }}" type="submit">Generate new keys</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Integration -->
+        <section id="integration">
+            <div class="card">
+                <div class="card-header"><h3 class="h5 mb-0">Integration <span class="text-muted small">code to add to {{ site.url }}</span></h3></div>
+                <div class="card-body">
+                    <ol class="mb-3">
+                        <li class="mb-2">Download <a href="{{ url_for('static', filename='webpush-sw.js') }}" download><code>webpush-sw.js</code></a>
+                            and publish it at the root of the site: <code>{{ site.url }}/webpush-sw.js</code> (the service worker
+                            receives the notifications; at the root it works on every page).</li>
+                        <li class="mb-2">Add this code to the pages (e.g. in the footer of the theme): a visitor enables the notifications
+                            with the button, the script does the rest (permission, subscription, renewal).
+                            <div class="position-relative mt-1">
+<pre class="bg-light border rounded p-2 small mb-0" id="snippet"><code>&lt;script src="{{ public_url }}/static/webpush-client.js" defer
+        data-api="{{ public_url }}/api/v1" data-site="{{ site.code }}"
+        data-service-worker="/webpush-sw.js"&gt;&lt;/script&gt;
+&lt;button type="button" data-webpush-toggle hidden
+        data-label-on="Disable notifications"&gt;Enable notifications&lt;/button&gt;</code></pre>
+                                <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-1 copy" type="button" data-target="snippet">Copy</button>
+                            </div>
+                            <div class="form-text">The button stays hidden where push is not supported (or blocked by the visitor). Without the button,
+                                call <code>WebPush.subscribe()</code> from your own code; <code>WebPush.state()</code> tells
+                                <code>subscribed</code>, <code>unsubscribed</code>, <code>blocked</code> or <code>unsupported</code>.</div>
+                        </li>
+                        <li>Queue the messages from the console (Messages) or from the CMS with an <a href="{{ url_for('api_tokens') }}">API token</a>:
+<pre class="bg-light border rounded p-2 small mb-0 mt-1"><code>curl -X POST {{ public_url }}/api/v1/sites/{{ site.code }}/messages \
+  -H "Authorization: Bearer wp_..." -H "Content-Type: application/json" \
+  -d '{"title": "Title", "url": "{{ site.url }}/article", "options": {"body": "Text", "image": "https://..."}}'</code></pre>
+                        </li>
+                    </ol>
+                    <p class="small text-muted">Origins allowed to subscribe: {% for o in origins %}<code>{{ o }}</code>{{ ', ' if not loop.last }}{% endfor %}
+                        (the last one is the console, for the test page).</p>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('site_test_page', site_id=site.id) }}">Open the test page</a>
+                    <span class="small text-muted ms-1">the same code in a page of the console: subscribe this browser and receive the messages of the site</span>
+                </div>
+
+                <!-- Test browsers -->
+                <div class="card-body border-top">
+                    <h4 class="h6">Test browsers <span class="text-muted small">receive only the tests (button Send test of a message)</span></h4>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <button class="btn btn-sm btn-primary" type="button" id="test-subscribe"
+                                {% if not site.vapid_public_key %}disabled title="The site has no keys"{% endif %}>Use this browser as test browser</button>
+                        <span class="small" id="test-status"></span>
+                    </div>
+                    {% if test_subscribers %}
+                        <ul class="list-group list-group-flush small">
+                            {% for t in test_subscribers %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span><span class="text-truncate d-inline-block align-bottom" style="max-width: 32rem;">{{ t.user_agent or 'Browser' }}</span>
+                                        <span class="text-muted">&middot; added {{ t.created_at.strftime('%d/%m/%Y') }}{{ ', last test ' ~ t.last_success_at.strftime('%d/%m %H:%M') if t.last_success_at }}</span></span>
+                                    <form method="POST" action="{{ url_for('site_test_subscriber_remove', site_id=site.id, subscriber_id=t.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="small text-muted mb-0">No test browser yet. The console must be on https (or localhost) for the browser to subscribe.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <script>
+            // Copy buttons
+            document.querySelectorAll('.copy').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var target = document.getElementById(button.dataset.target);
+                    var text = target.value !== undefined ? target.value : target.textContent;
+                    navigator.clipboard.writeText(text).then(function () {
+                        button.textContent = 'Copied';
+                        setTimeout(function () { button.textContent = 'Copy'; }, 2000);
+                    });
+                });
+            });
+
+            // This browser as test browser: service worker of the console, subscription with the key of the site
+            (function () {
+                var button = document.getElementById('test-subscribe');
+                var status = document.getElementById('test-status');
+                var publicKey = {{ (site.vapid_public_key or '')|tojson }};
+                var worker = {{ url_for('test_service_worker', code=site.code)|tojson }};
+                function say(text, kind) {
+                    status.textContent = text;
+                    status.className = 'small text-' + (kind || 'muted');
+                }
+                function keyBytes(base64) {
+                    var padded = (base64 + '='.repeat((4 - base64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+                    return Uint8Array.from(atob(padded), function (c) { return c.charCodeAt(0); });
+                }
+                function activated(registration) {
+                    return new Promise(function (resolve) {
+                        var sw = registration.installing || registration.waiting || registration.active;
+                        if (!sw || sw.state === 'activated') return resolve(registration);
+                        sw.addEventListener('statechange', function () { if (sw.state === 'activated') resolve(registration); });
+                    });
+                }
+                if (!button) return;
+                if (!('serviceWorker' in navigator) || !('PushManager' in window) || !window.isSecureContext) {
+                    button.disabled = true;
+                    say('This browser (or the console in http) does not support push notifications.', 'danger');
+                    return;
+                }
+                button.addEventListener('click', function () {
+                    button.disabled = true;
+                    say('Waiting for the permission...');
+                    Notification.requestPermission().then(function (permission) {
+                        if (permission !== 'granted') throw new Error('Notifications blocked: allow them in the settings of the site');
+                        return navigator.serviceWorker.register(worker, {scope: worker.replace(/[^/]*$/, '')});
+                    }).then(activated).then(function (registration) {
+                        return registration.pushManager.getSubscription().then(function (old) {
+                            return old ? old.unsubscribe() : null;
+                        }).then(function () {
+                            return registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: keyBytes(publicKey)});
+                        });
+                    }).then(function (subscription) {
+                        return fetch({{ url_for('site_test_subscription', site_id=site.id)|tojson }}, {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': {{ (csrf_access_token or '')|tojson }}},
+                            body: JSON.stringify(subscription)
+                        });
+                    }).then(function (response) {
+                        if (!response.ok) throw new Error('The console answered ' + response.status);
+                        say('Test browser added: reload the page to see it', 'success');
+                    }).catch(function (e) {
+                        say(e.message, 'danger');
+                        button.disabled = false;
+                    });
+                });
+            })();
+        </script>
+    {% endif %}
+</main>
+{% include 'footer.html' %}
+</body>

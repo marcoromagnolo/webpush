@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+{% include 'head.html' %}
+<body>
+{% include 'header.html' %}
+<main class="dashboard">
+    {% set site = current_site() %}
+
+    {% if not all_sites() %}
+        <section>
+            <div class="card border-success">
+                <div class="card-body">
+                    <h3 class="h5">Welcome to WebPush</h3>
+                    <p class="mb-2">Start with a site: its VAPID keys and a default schedule are created with it, then the tab
+                        <b>Integration</b> gives the code to add to the website.</p>
+                    <a class="btn btn-success" href="{{ url_for('site_new') }}">Add the first site</a>
+                </div>
+            </div>
+        </section>
+    {% endif %}
+
+    <!-- Automatic refresh of counters, sites, today, sendings and errors -->
+    <div class="d-flex justify-content-end mb-2">
+        {% with refresh_key = 'home' %}{% include 'refresh_control.html' %}{% endwith %}
+    </div>
+
+    <!-- Counters: a click opens the details -->
+    <section class="stats">
+        <div class="row g-3" data-refresh-box="stats">
+            <div class="col-6 col-md-4 col-xl">
+                <a class="stat stat-main" href="{{ url_for('subscribers') }}">
+                    <span class="stat-value">{{ stats.active }}</span>
+                    <span class="stat-label">Active subscribers</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <a class="stat" href="{{ url_for('subscribers') }}" title="Browsers subscribed today / in the last 7 days">
+                    <span class="stat-value">+{{ stats.new_today }} <small class="text-muted fs-6">/ +{{ stats.new_week }}</small></span>
+                    <span class="stat-label">New today / 7 days</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <a class="stat {{ 'stat-error' if stats.removed_week > stats.new_week }}" href="{{ url_for('subscribers', status='removed') }}"
+                   title="Subscriptions expired, revoked by the browser, unsubscribed or failing, in the last 7 days">
+                    <span class="stat-value">{{ stats.removed_week }}</span>
+                    <span class="stat-label">Removed in 7 days</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <a class="stat" href="{{ url_for('messages', status='queued') }}">
+                    <span class="stat-value">{{ stats.queued }}</span>
+                    <span class="stat-label">Messages in the queue</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <a class="stat" href="{{ url_for('messages', status='sent') }}">
+                    <span class="stat-value">{{ stats.sent_today }}</span>
+                    <span class="stat-label">Messages sent today</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <div class="stat {{ 'stat-error' if stats.delivery_rate is not none and stats.delivery_rate < 0.8 }}"
+                     title="{{ stats.success }} delivered of {{ stats.total }} sendings in the last 7 days">
+                    <span class="stat-value">{{ '%.0f%%'|format(stats.delivery_rate * 100) if stats.delivery_rate is not none else '-' }}</span>
+                    <span class="stat-label">Delivered, 7 days</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl">
+                <div class="stat" title="Clicks on the notifications in the last 7 days, out of the delivered ones">
+                    <span class="stat-value">{{ stats.clicks_week }} <small class="text-muted fs-6">{{ '%.1f%%'|format(stats.ctr * 100) if stats.ctr is not none else '' }}</small></span>
+                    <span class="stat-label">Clicks, 7 days (CTR)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div data-refresh-box="sites">
+    {% if summary %}
+        <!-- All the sites -->
+        <section>
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="h5 mb-0">Sites</h3>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('sites') }}">Manage sites</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th scope="col">Site</th>
+                            <th scope="col" class="text-end">Subscribers</th>
+                            <th scope="col" class="text-end">Queued</th>
+                            <th scope="col" class="text-end">Sent today</th>
+                            <th scope="col" class="text-end">Slots a week</th>
+                            <th scope="col"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for s in summary %}
+                            <tr class="{{ 'text-muted' if not s.enabled }}">
+                                <td>
+                                    <a href="{{ url_for('select_site', site=s.code, next=url_for('index')) }}" title="Show only this site">{{ s.name }}</a>
+                                    {% if not s.enabled %}<span class="badge bg-secondary">Disabled</span>{% endif %}
+                                    {% if not s.has_keys %}<span class="badge bg-danger" title="Nothing can be sent">No keys</span>{% endif %}
+                                </td>
+                                <td class="text-end">{{ s.subscribers }}</td>
+                                <td class="text-end {{ 'text-danger' if s.enabled and s.slots and not s.queued }}"
+                                    title="{{ 'Empty queue: the next slots send nothing' if s.enabled and s.slots and not s.queued }}">{{ s.queued }}</td>
+                                <td class="text-end">{{ s.sent_today }}</td>
+                                <td class="text-end">{{ s.slots }}</td>
+                                <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('site_edit', site_id=s.id) }}">Settings</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    {% endif %}
+    </div>
+
+    <div class="row g-3">
+        <!-- Today: slots and sendings -->
+        <section class="col-lg-7" data-refresh-box="today">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="h5 mb-0">Today <span class="text-muted small">{{ DAY_LABELS[now.isoweekday()] }} {{ now.strftime('%d/%m/%Y') }}</span></h3>
+                    {% if site %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('schedules') }}">Schedule</a>{% endif %}
+                </div>
+                <div class="card-body p-0">
+                    {% if timeline %}
+                        <div class="day-view">
+                            {% for hour in timeline %}
+                                <div class="day-hour {{ 'day-hour-now' if hour.now }} {{ 'day-hour-empty' if not hour.entries }}">
+                                    <div class="day-hour-label">{{ '%02d:00'|format(hour.hour) }}</div>
+                                    <div class="day-hour-entries">
+                                        {% for e in hour.entries %}
+                                            <div class="day-entry day-entry-{{ e.status }}">
+                                                <span class="day-entry-time">{{ e.time }}</span>
+                                                {% if e.site %}<span class="badge bg-light text-dark border">{{ e.site }}</span>{% endif %}
+                                                {% if e.message_id %}
+                                                    <a href="{{ url_for('message_edit', message_id=e.message_id) }}" class="text-truncate" style="max-width: 28rem;">{{ e.title }}</a>
+                                                {% endif %}
+                                                <span class="text-muted small">{{ e.detail }}</span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <p class="text-muted small px-3 py-2 mb-0 border-top">
+                            <span class="state-dot" style="background:#198754"></span>sent
+                            <span class="state-dot ms-2" style="background:#dc3545"></span>failed
+                            <span class="state-dot ms-2" style="background:#ffc107"></span>nothing sent
+                            <span class="state-dot ms-2" style="background:#0dcaf0"></span>sending
+                            <span class="state-dot ms-2" style="background:#0d6efd"></span>scheduled (next messages of the queue, in order)
+                        </p>
+                    {% else %}
+                        <p class="text-muted p-3 mb-0">No slot today{% if site %}: <a href="{{ url_for('schedules') }}">set the schedule</a>{% endif %}.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <div class="col-lg-5 d-flex flex-column gap-3">
+            <!-- Latest deliveries -->
+            <section class="mb-0" data-refresh-box="sendings">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="h5 mb-0">Latest sendings</h3>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('messages', status='sent') }}">Sent messages</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <tbody>
+                            {% for d in deliveries %}
+                                <tr>
+                                    <td class="small text-nowrap text-muted">{{ d.start_time.strftime('%d/%m %H:%M') }}</td>
+                                    <td class="small">
+                                        {% if d.message_id %}<a href="{{ url_for('message_edit', message_id=d.message_id) }}">{{ d.title|truncate(60) }}</a>{% else %}<span class="text-muted">-</span>{% endif %}
+                                        {% if not site %}<br><span class="text-muted">{{ d.site_name }}</span>{% endif %}
+                                    </td>
+                                    <td class="small text-end text-nowrap">
+                                        {% if d.kind == 'test' %}<span class="badge bg-light text-dark border">test</span>{% elif d.kind == 'now' %}<span class="badge bg-light text-dark border">by hand</span>{% endif %}
+                                        <span class="{{ 'text-danger' if d.total and not d.success }}" title="delivered / sent">{{ d.success }}/{{ d.total }}</span>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr><td class="text-muted p-3">Nothing sent yet.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Open errors -->
+            <section class="mb-0" data-refresh-box="errors">
+                <div class="card {{ 'border-danger' if errors }}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="h5 mb-0">Open errors</h3>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('errors') }}">Errors</a>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for e in errors %}
+                            <li class="list-group-item small">
+                                <span class="text-muted">{{ e.created_at.strftime('%d/%m %H:%M') }}</span>
+                                <span class="badge {{ PHASE_BADGES.get(e.phase, 'bg-secondary') }}">{{ PHASES.get(e.phase, e.phase) }}</span>
+                                <span class="text-break">{{ e.message|truncate(160) }}</span>
+                            </li>
+                        {% else %}
+                            <li class="list-group-item text-muted small">No open error.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+</main>
+{% include 'footer.html' %}
+</body>
