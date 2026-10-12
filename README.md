@@ -224,17 +224,25 @@ Server setup (once per server, as an administrator)
        sudo chmod 750 /srv/webpush
        sudo usermod -aG docker webpush
 
-   An administrator opens a shell as `webpush` with `sudo -iu webpush`.
+   An administrator opens a shell as `webpush` with `sudo -iu webpush`; for a direct SSH access put a public key in
+   `/srv/webpush/.ssh/authorized_keys` (owned by `webpush`, mode 600, directory 700).
 
 3. MariaDB account `webpush`, authenticated by the Linux user (unix socket, no password): it creates the database
-   `webpush` and the user of the application. `wait_timeout` of MariaDB (default 8 hours) must stay above
-   `DB_POOL_RECYCLE`:
+   `webpush` and the user of the application `webpush_app`, and can only use the database `webpush`.
+   `wait_timeout` of MariaDB (default 8 hours) must stay above `DB_POOL_RECYCLE`. The `ALTER USER` is needed on a
+   server of the single site version: its `sql/create_db.sql` created `'webpush'@'localhost'` **with a password**,
+   `CREATE USER IF NOT EXISTS` leaves it as it is and then `mariadb` as the user `webpush` answers
+   `ERROR 1045 (28000): Access denied for user 'webpush'@'localhost' (using password: NO)` (the old application
+   stops working with that password: it is replaced, *Upgrade from the single site version*):
 
        sudo mariadb <<'SQL'
        CREATE USER IF NOT EXISTS 'webpush'@'localhost' IDENTIFIED VIA unix_socket;
+       ALTER USER 'webpush'@'localhost' IDENTIFIED VIA unix_socket;
        GRANT CREATE USER ON *.* TO 'webpush'@'localhost';
        GRANT ALL PRIVILEGES ON `webpush`.* TO 'webpush'@'localhost' WITH GRANT OPTION;
        SQL
+       # check: it prints webpush@localhost
+       sudo -iu webpush mariadb -N -e "SELECT CURRENT_USER();"
 
 4. GitHub login of the user `webpush` (the token is saved in `/srv/webpush/.config/gh`):
 
@@ -243,14 +251,21 @@ Server setup (once per server, as an administrator)
 Server installation (as the user `webpush`)
 -------------------------------------------
 
-Without sudo, except step 6 (nginx).
+Without sudo, except step 6 (nginx). Every block of commands is complete: a new shell doesn't keep the variables of
+the previous steps.
 
 1. Code:
 
        gh repo clone marcoromagnolo/webpush /srv/webpush/app
 
-2. Database, MariaDB user and `.env`: the block of step 3 of *Local installation*, with `mariadb` instead of
-   `sudo mariadb` (the account `webpush` connects without password) and the production settings:
+2. Database, MariaDB user and `.env`. The account `webpush` connects without password (*Server setup*, step 3). The
+   password of the MariaDB user of the application is generated and written only in `.env` (never shown). The user is
+   `@'127.0.0.1'`, not `@'localhost'`: the container connects over TCP to 127.0.0.1, and with `skip_name_resolve`
+   (default of many MariaDB installations) a user `@'localhost'` matches only the connections from the unix socket
+   (error 1698 *Access denied*, whatever the password). The block creates `.env` from the template with the database,
+   the port, the production settings and a generated `JWT_SECRET_KEY`. It can be run again: the user gets a new
+   password and only `DB_PASSWORD` of the existing `.env` changes (then recreate the container, step 4: `--env-file`
+   is read only by `docker run`):
 
        cd /srv/webpush/app
        DB_PASS=$(openssl rand -base64 24 | tr -d '/+=')
@@ -259,6 +274,7 @@ Without sudo, except step 6 (nginx).
        CREATE USER IF NOT EXISTS 'webpush_app'@'127.0.0.1' IDENTIFIED BY '$DB_PASS';
        ALTER USER 'webpush_app'@'127.0.0.1' IDENTIFIED BY '$DB_PASS';
        GRANT ALL PRIVILEGES ON webpush.* TO 'webpush_app'@'127.0.0.1';
+       DROP USER IF EXISTS 'webpush_app'@'localhost';
        SQL
        if [ -f .env ]; then
            sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASS|" .env
@@ -275,8 +291,12 @@ Without sudo, except step 6 (nginx).
        fi
        chmod 600 .env
        unset DB_PASS
+       # check: it prints webpush_app@127.0.0.1, the credentials of the application are right
        MYSQL_PWD="$(grep '^DB_PASSWORD=' .env | cut -d= -f2-)" \
            mariadb -h 127.0.0.1 -u webpush_app -N -e "SELECT CURRENT_USER();"
+
+   `ERROR 1045 ... 'webpush'@'localhost' (using password: NO)` at the first `mariadb`: the account `webpush` still has
+   the password of the single site version, `ALTER USER` of *Server setup*, step 3.
 
    Then set `PUBLIC_URL` (the https address of the application, e.g. `https://www.example.com/notify`) and, for a
    site of the single site version, `DEFAULT_SITE`:
