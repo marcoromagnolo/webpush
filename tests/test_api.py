@@ -10,7 +10,7 @@ import util
 SITE = {'id': 1, 'code': 'news', 'name': 'News', 'url': 'https://www.news.example', 'enabled': True,
         'allowed_origins': 'https://m.news.example', 'vapid_public_key': 'BPUBLIC', 'vapid_private_key': 'x'}
 OTHER = dict(SITE, id=2, code='other', url='https://other.example', allowed_origins=None)
-TOKENS = {'site-token': {'id': 1, 'name': 'cms', 'site_id': 1}, 'all-token': {'id': 2, 'name': 'all', 'site_id': None},
+TOKENS = {'site-token': {'id': 1, 'name': 'cms', 'site_id': 1},
           'other-token': {'id': 3, 'name': 'other', 'site_id': 2}}
 ORIGIN = {'Origin': 'https://www.news.example'}
 SUBSCRIPTION = {'endpoint': 'https://fcm.googleapis.com/fcm/send/abc', 'expirationTime': 1893456000000,
@@ -87,11 +87,10 @@ def test_messages_need_a_token_of_the_site(client, calls):
     assert client.post(url, json=body, headers=bearer('wrong')).status_code == 401
     assert ('block_ip', '127.0.0.1') in calls
     assert client.post(url, json=body, headers=bearer('other-token')).status_code == 403
-    for token in ('site-token', 'all-token'):
-        response = client.post(url, json=body, headers=bearer(token))
-        assert response.status_code == 202 and response.get_json() == {'id': 42, 'status': 'queued'}
+    response = client.post(url, json=body, headers=bearer('site-token'))
+    assert response.status_code == 202 and response.get_json() == {'id': 42, 'status': 'queued'}
     _, site_id, title, options, send_after, created_by = calls[-1]
-    assert (site_id, title, send_after, created_by) == (1, 'T', None, 'token all')
+    assert (site_id, title, send_after, created_by) == (1, 'T', None, 'token cms')
     assert json.loads(options) == {'body': 'B', 'data': {'url': 'https://www.news.example/a'}}
 
 

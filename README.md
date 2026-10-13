@@ -546,8 +546,11 @@ first):
     git diff --name-only "$old" HEAD -- sql/upgrade_   # database upgrades to run, if any
 
 * Database: every change of the schema comes with a script `sql/upgrade_YYYY-MM-DD_<name>.sql` (the same change is
-  also made in `sql/create_tables.sql`). Run the new ones once, in date order, before restarting:
+  also made in `sql/create_tables.sql`). Stop the container first (the old code would run on the new schema, e.g. a
+  slot of the schedule), then run the new ones once, in date order, after a backup:
 
+      ./docker-stop.sh
+      mariadb-dump webpush > /srv/webpush/webpush-backup-$(date +%F).sql
       mariadb webpush < sql/upgrade_YYYY-MM-DD_<name>.sql
 
 * Application: rebuild the image and recreate the container (the dependencies are reinstalled when
@@ -600,7 +603,7 @@ missing or wrong, 403 token of another site or origin not allowed, 404 unknown s
 | `GET /ping` | token | check the token |
 | `GET /health` (no `/api/v1`) | public | application and database answer |
 
-Token: `Authorization: Bearer wp_...`, created in the page **API tokens** for one site or all the sites.
+Token: `Authorization: Bearer wp_...`, created in the page **API tokens** for one site: it works only for that site.
 
 Body of `POST /sites/<code>/messages`:
 

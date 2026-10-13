@@ -137,8 +137,43 @@ footer {
     vertical-align: baseline;
 }
 
-.schedules input.day-times {
-    min-width: 18rem;
+/* Page Schedules: grid times x days */
+.schedule-grid .time-input {
+    width: 7.5rem;
+}
+
+.schedule-grid th.today, .schedule-grid td.today {
+    background-color: var(--bs-primary-bg-subtle);
+}
+
+.schedule-grid .day-head {
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--bs-body-color);
+}
+
+.slot-cell {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: .5rem;
+    background: var(--bs-body-bg);
+    color: #fff;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.slot-cell:hover {
+    border-color: var(--bs-primary);
+}
+
+.slot-cell.on {
+    border: 1px solid var(--bs-primary);
+    background: var(--bs-primary);
+}
+
+.slot-cell.next {
+    box-shadow: 0 0 0 2px var(--bs-body-bg), 0 0 0 4px var(--bs-success);
 }
 
 .text-truncate-2 {

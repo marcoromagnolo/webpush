@@ -98,9 +98,9 @@ def site_id_filter():
 @app.context_processor
 def common():
     def open_errors_count():
-        # badge of the menu item Errors: called by the templates only (header.html)
+        # badge of the menu item Errors, the errors the page shows (site selected): called by header.html only
         try:
-            return sum(db.count_open_errors().values())
+            return sum(db.count_open_errors(site_id_filter()).values())
         except Exception:
             return 0
 
@@ -599,14 +599,35 @@ def parse_times(text):
     return sorted(times)
 
 
-def schedule_summary(site, slots):
-    per_day = {day: [s for s in slots if s['day'] == day] for day in scheduler.DAY_LABELS}
-    counts = [len(v) for v in per_day.values() if v]
-    return {
-        'per_day': per_day,
-        'slots_week': len(slots),
-        'max_per_day': max(counts) if counts else 0,
-    }
+def schedule_grid(slots=None, form=None):
+    """Rows of the grid of the page Schedules, [{'time': 'HH:MM', 'days': [1, 3...]}] by time: from the slots or,
+    after an error, from the form (its invalid times are left out)."""
+    times = {}
+    for day in scheduler.DAY_LABELS:
+        if form is not None:
+            day_times = []
+            for text in form.get(f'day_{day}', '').split():
+                try:
+                    day_times += parse_times(text)
+                except ValueError:
+                    pass
+        else:
+            day_times = [(s['hour'], s['minute']) for s in slots if s['day'] == day]
+        for hour, minute in day_times:
+            times.setdefault(f"{hour:02}:{minute:02}", set()).add(day)
+    return [{'time': time, 'days': sorted(days)} for time, days in sorted(times.items())]
+
+
+def next_slot(slots, now=None):
+    """The next slot after now, (day, 'HH:MM'), within a week; None without slots."""
+    now = now or datetime.now()
+    minutes = now.isoweekday() * 1440 + now.hour * 60 + now.minute
+    week = 7 * 1440
+    ahead = [((s['day'] * 1440 + s['hour'] * 60 + s['minute'] - minutes - 1) % week, s) for s in slots]
+    if not ahead:
+        return None
+    _, slot = min(ahead, key=lambda a: a[0])
+    return slot['day'], f"{slot['hour']:02}:{slot['minute']:02}"
 
 
 @app.route("/schedules", methods=["GET", "POST"])
@@ -635,8 +656,9 @@ def schedules():
             logger.info(f"Schedule of {site['code']} saved: {len(slots)} slots a week")
             return redirect(url_for('schedules', message='Schedule saved'))
     slots = db.get_slots(site['id'])
-    return render_template("schedules.html", title="Schedules", site=site, form=form, error=error,
-                           summary=schedule_summary(site, slots), message=request.args.get('message'),
+    return render_template("schedules.html", title="Schedules", site=site, error=error,
+                           grid=schedule_grid(slots, form), next_slot=next_slot(slots), today=datetime.now().isoweekday(),
+                           message=request.args.get('message'),
                            queued=db.count_messages_by_status(site['id'])['queued']), (400 if error else 200)
 
 
@@ -873,19 +895,20 @@ def api_tokens():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         expiration = request.form.get('expires', '')
-        site_id = request.form.get('site_id', type=int) or None
+        site_id = request.form.get('site_id', type=int)
         site = db.get_site(site_id) if site_id else None
         if not 1 <= len(name) <= 100:
             error = 'The name of the client is required (max 100 characters)'
         elif expiration not in TOKEN_EXPIRATIONS:
             error = 'Unknown expiration'
-        elif site_id and site is None:
-            error = 'Unknown site'
+        elif site is None:
+            # a token is always of one site: a stolen token can't queue messages on the other sites
+            error = 'Choose the site of the token'
         else:
             token, token_hash, prefix = api.generate_token()
             expires_at = datetime.now() + timedelta(days=int(expiration)) if expiration else None
             db.create_api_token(name, token_hash, prefix, int(get_jwt_identity()), site_id, expires_at)
-            logger.info(f"API token created for '{name}' ({prefix}...), site: {site['code'] if site else 'all'}, expires: {expires_at}")
+            logger.info(f"API token created for '{name}' ({prefix}...), site: {site['code']}, expires: {expires_at}")
             # shown only in this response: it can't be read again
             new_token = {'name': name, 'token': token, 'expires_at': expires_at, 'site': site}
     return render_template("api_tokens.html", title="API tokens", tokens=db.get_api_tokens(), new_token=new_token,

@@ -12,7 +12,7 @@
         <section>
             <div class="card border-success">
                 <div class="card-header bg-success-subtle">
-                    <h3 class="h6 mb-0">New token for {{ new_token.name }} <span class="text-muted small">{{ new_token.site.name if new_token.site else 'all the sites' }}</span></h3>
+                    <h3 class="h6 mb-0">New token for {{ new_token.name }} <span class="text-muted small">{{ new_token.site.name }}</span></h3>
                 </div>
                 <div class="card-body">
                     <p class="mb-2"><b>Copy it now: it will not be shown again.</b> Only a fingerprint is stored, so a lost token can't be recovered: revoke it and create a new one.</p>
@@ -39,9 +39,9 @@
                         <input class="form-control form-control-sm" type="text" id="name" name="name" maxlength="100" required placeholder="WordPress mynews">
                     </div>
                     <div class="col-6 col-md-3 col-lg-2">
-                        <label class="form-label small mb-1" for="site_id">Site{{ info("The token works only for this site (its url /api/v1/sites/<code>/...). All the sites: a token for every site, e.g. a central CMS.") }}</label>
-                        <select class="form-select form-select-sm" id="site_id" name="site_id">
-                            <option value="">All the sites</option>
+                        <label class="form-label small mb-1" for="site_id">Site{{ info("The token works only for this site (its url /api/v1/sites/<code>/...): every site has its own tokens.") }}</label>
+                        <select class="form-select form-select-sm" id="site_id" name="site_id" required>
+                            {% if not current_site() %}<option value="" selected disabled>Choose a site</option>{% endif %}
                             {% for s in sites %}
                                 <option value="{{ s.id }}" {% if current_site() and current_site().id == s.id %}selected{% endif %}>{{ s.name }}</option>
                             {% endfor %}
@@ -79,7 +79,7 @@
                         {% set expired = token.expires_at and token.expires_at <= now %}
                         <tr {% if token.revoked_at or expired %}class="text-muted"{% endif %}>
                             <td>{{ token.name }}</td>
-                            <td class="small">{{ token.site_name or 'All' }}</td>
+                            <td class="small">{{ token.site_name }}</td>
                             <td class="font-monospace small">{{ token.prefix }}&hellip;</td>
                             <td class="small">{{ token.created_at.strftime('%d/%m/%Y %H:%M') }}{% if token.created_by %}<br><span class="text-muted">by {{ token.created_by }}</span>{% endif %}</td>
                             <td class="small">{{ token.expires_at.strftime('%d/%m/%Y') if token.expires_at else 'Never' }}</td>
@@ -119,7 +119,7 @@
             <div class="card-header"><h3 class="h6 mb-0">REST API</h3></div>
             <div class="card-body small">
                 <p>JSON API at <code>{{ api_url }}</code>, the site in the url (its code). The requests marked <i>token</i> need the header
-                    <code>Authorization: Bearer &lt;token&gt;</code>, a token of the site or of all the sites. Repeated requests with a wrong
+                    <code>Authorization: Bearer &lt;token&gt;</code>, a token of the site. Repeated requests with a wrong
                     token block the ip like the failed logins.</p>
                 <table class="table table-sm mb-3">
                     <tbody>

@@ -36,50 +36,67 @@
 
         <form method="POST" action="{{ url_for('schedules') }}" class="row g-3" id="schedule-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_access_token }}">
-            <section class="col-lg-8 mb-0">
+            {% for day in DAY_LABELS %}<input type="hidden" name="day_{{ day }}" id="day_{{ day }}">{% endfor %}
+            <section class="col-xl-8 mb-0">
                 <div class="card">
                     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                        <h3 class="h5 mb-0">Schedule <span class="text-muted small">{{ site.name }}</span></h3>
+                        <h3 class="h5 mb-0">Schedule <span class="text-muted small">{{ site.name }}</span>{{ info("Times of the week when the next message of the queue is sent to all the subscribers, local time of the server. Click a cell to switch the time on or off that day, a day to switch its whole column; change a time in its field, × removes it.") }}</h3>
                         <div class="d-flex flex-wrap gap-1">
-                            <span class="small text-muted align-self-center me-1">Fill every day:</span>
+                            <span class="small text-muted align-self-center me-1">Start from:</span>
                             <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="{{ DEFAULT_TIMES_TEXT }}"
-                                    title="The default: breakfast and commute, lunch break, afternoon, way home, after dinner">5 best times</button>
+                                    title="The default, every day: breakfast and commute, lunch break, afternoon, way home, after dinner">5 best times</button>
                             <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="08:00 13:00 20:30"
-                                    title="Morning, lunch, evening">3 times</button>
+                                    title="Every day: morning, lunch, evening">3 times</button>
                         </div>
                     </div>
                     <div class="table-responsive">
-                        <table class="table align-middle mb-0 schedules">
+                        <table class="table align-middle mb-0 schedule-grid">
                             <thead>
-                            <tr><th scope="col">Day</th><th scope="col">Times <span class="text-muted small fw-normal">HH:MM separated by spaces or commas</span>{{ info("Times of the day when the next message of the queue is sent to all the subscribers, local time of the server. HH:MM or only the hour (8 = 08:00), separated by spaces or commas, e.g. 7:30 12:30 21. Empty: no sending that day. The whole week can't be empty.") }}</th>
-                                <th scope="col" class="text-end">Slots</th><th scope="col"></th></tr>
+                            <tr>
+                                <th scope="col">Time</th>
+                                {% for day, label in DAY_LABELS.items() %}
+                                    <th scope="col" class="text-center {% if day == today %}today{% endif %}">
+                                        <button class="btn btn-link btn-sm p-0 day-head" type="button" data-day="{{ day }}"
+                                                title="{{ label }}: switch all the times on or off">{{ label[:3] }}</button>
+                                        {% if day == today %}<div class="small text-primary fw-normal lh-1">today</div>{% endif %}
+                                    </th>
+                                {% endfor %}
+                                <th scope="col"></th>
+                            </tr>
                             </thead>
-                            <tbody>
-                            {% for day, label in DAY_LABELS.items() %}
-                                <tr>
-                                    <th scope="row" class="text-nowrap">{{ label }}</th>
-                                    <td>
-                                        <input class="form-control form-control-sm font-monospace day-times" type="text" name="day_{{ day }}" data-day="{{ day }}"
-                                               value="{% if form %}{{ form['day_' ~ day] }}{% else %}{% for s in summary.per_day[day] %}{{ '%02d:%02d'|format(s.hour, s.minute) }}{{ ' ' if not loop.last }}{% endfor %}{% endif %}"
-                                               placeholder="no sending this day" aria-label="Times of {{ label }}">
-                                    </td>
-                                    <td class="text-end text-muted small day-count" data-day="{{ day }}">{{ summary.per_day[day]|length }}</td>
-                                    <td class="text-end text-nowrap">
-                                        <button class="btn btn-sm btn-outline-secondary" type="button" data-copy="{{ day }}" title="Copy these times to every day">to all</button>
-                                        {% if day <= 5 %}<button class="btn btn-sm btn-outline-secondary" type="button" data-copy-weekdays="{{ day }}" title="Copy to Monday-Friday">to Mon-Fri</button>{% endif %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
+                            <tbody id="grid-rows"></tbody>
+                            <tfoot>
+                            <tr class="table-light">
+                                <td colspan="9">
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <input class="form-control form-control-sm time-input" type="time" id="new-time" aria-label="New time">
+                                        <button class="btn btn-sm btn-outline-primary" type="button" id="add-time" title="Add the time every day (then switch off the days you don't want)">+ Add time</button>
+                                        <span class="small text-muted" id="add-note"></span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="text-muted small">
+                                <th scope="row" class="fw-normal">Sendings</th>
+                                {% for day in DAY_LABELS %}<td class="text-center day-count" data-day="{{ day }}"></td>{% endfor %}
+                                <td></td>
+                            </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
             </section>
 
-            <section class="col-lg-4 mb-0">
+            <section class="col-xl-4 mb-0">
                 <div class="card">
-                    <div class="card-header"><h3 class="h6 mb-0">Sending</h3></div>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="h6 mb-0">Sending</h3>
+                        <span class="badge bg-warning text-dark d-none" id="unsaved">Unsaved changes</span>
+                    </div>
                     <div class="card-body">
+                        {% if next_slot %}
+                            <p class="small mb-2" id="next-slot">Next sending: <b>{{ DAY_LABELS[next_slot[0]] if next_slot[0] != today else 'today' }} {{ next_slot[1] }}</b>
+                                {% if queued %}(the next message of the queue){% else %}<span class="text-warning-emphasis">but the queue is empty</span>{% endif %}</p>
+                        {% endif %}
                         <div class="small" id="schedule-explain"></div>
                         <hr>
                         <p class="small mb-0">Every slot sends the next message of the queue to <b>all</b> the subscribers: a
@@ -90,7 +107,7 @@
                             Times are local time of the server.</p>
                     </div>
                     <div class="card-footer d-flex gap-2">
-                        <button class="btn btn-primary" type="submit">Save schedule</button>
+                        <button class="btn btn-primary" type="submit" id="save">Save schedule</button>
                         <a class="btn btn-outline-secondary" href="{{ url_for('schedules') }}">Undo changes</a>
                     </div>
                 </div>
@@ -98,16 +115,63 @@
         </form>
 
         <script>
-            // Presets, copies between the days and the explanation, recomputed while typing
+            // Grid times x days: the rows are the times, a cell switches the time on a day. At the submit the hidden
+            // fields day_1..day_7 get the times of every day (the format of the server, HH:MM separated by spaces).
             (function () {
-                var inputs = Array.prototype.slice.call(document.querySelectorAll('.day-times'));
-                function parse(text) {
-                    return text.split(/[\s,;]+/).filter(Boolean).length;
+                var DAYS = [1, 2, 3, 4, 5, 6, 7];
+                var NEXT = {{ (next_slot|list if next_slot else None)|tojson }};
+                var rows = {{ grid|tojson }};  // [{time: 'HH:MM', days: [1, 2...]}]
+                function state() {
+                    return rows.map(function (row) { return row.time + '=' + row.days.join(','); }).join(' ');
                 }
-                function explain() {
-                    var counts = inputs.map(function (input) { return parse(input.value); });
-                    inputs.forEach(function (input, i) {
-                        document.querySelector('.day-count[data-day="' + input.dataset.day + '"]').textContent = counts[i];
+                var initial = state();
+                var body = document.getElementById('grid-rows');
+
+                function sortMerge() {
+                    // by time; two rows with the same time become one with the days of both
+                    var byTime = {};
+                    rows.forEach(function (row) {
+                        if (!row.time) return;
+                        var days = byTime[row.time] || (byTime[row.time] = {});
+                        row.days.forEach(function (d) { days[d] = true; });
+                    });
+                    rows = Object.keys(byTime).sort().map(function (time) {
+                        return {time: time, days: DAYS.filter(function (d) { return byTime[time][d]; })};
+                    });
+                }
+
+                function render() {
+                    body.innerHTML = '';
+                    rows.forEach(function (row, i) {
+                        var tr = document.createElement('tr');
+                        var html = '<td><input class="form-control form-control-sm time-input" type="time" value="' + row.time +
+                            '" data-row="' + i + '" aria-label="Time" required></td>';
+                        DAYS.forEach(function (d) {
+                            var on = row.days.indexOf(d) >= 0;
+                            var next = NEXT && NEXT[0] === d && NEXT[1] === row.time && state() === initial;
+                            html += '<td class="text-center' + (d === {{ today }} ? ' today' : '') + '"><button type="button" class="slot-cell' +
+                                (on ? ' on' : '') + (next ? ' next' : '') + '" data-row="' + i + '" data-day="' + d + '" aria-pressed="' + on +
+                                '" title="' + (on ? 'Sending' : 'No sending') + (next ? ', the next one' : '') + ': click to switch">' +
+                                (on ? '&#10003;' : '') + '</button></td>';
+                        });
+                        html += '<td class="text-end text-nowrap">' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary me-1" data-all="' + i + '" title="Every day / no day">' + (row.days.length === 7 ? 'none' : 'all') + '</button>' +
+                            '<button type="button" class="btn btn-sm btn-outline-danger" data-remove="' + i + '" title="Remove the time ' + row.time + '" aria-label="Remove ' + row.time + '">&times;</button></td>';
+                        tr.innerHTML = html;
+                        body.appendChild(tr);
+                    });
+                    if (!rows.length) {
+                        body.innerHTML = '<tr><td colspan="9" class="text-center text-muted p-4">No time: add one below or start from a preset.</td></tr>';
+                    }
+                    update();
+                }
+
+                function update() {
+                    var counts = DAYS.map(function (d) {
+                        return rows.filter(function (row) { return row.days.indexOf(d) >= 0; }).length;
+                    });
+                    document.querySelectorAll('.day-count').forEach(function (cell) {
+                        cell.textContent = counts[cell.dataset.day - 1];
                     });
                     var week = counts.reduce(function (a, b) { return a + b; }, 0);
                     var max = Math.max.apply(null, counts);
@@ -121,29 +185,85 @@
                             'make the visitors unsubscribe.</span>';
                     }
                     document.getElementById('schedule-explain').innerHTML = text;
+                    document.getElementById('save').disabled = !week;
+                    var changed = state() !== initial;
+                    document.getElementById('unsaved').classList.toggle('d-none', !changed);
+                    var next = document.getElementById('next-slot');
+                    if (next) next.classList.toggle('opacity-50', changed);
                 }
+
+                function toggle(list, day, on) {
+                    var has = list.indexOf(day) >= 0;
+                    if (on === undefined) on = !has;
+                    if (on && !has) list.push(day);
+                    if (!on && has) list.splice(list.indexOf(day), 1);
+                    list.sort();
+                }
+
+                body.addEventListener('click', function (event) {
+                    var target = event.target.closest('button');
+                    if (!target) return;
+                    if (target.dataset.day) {
+                        toggle(rows[target.dataset.row].days, +target.dataset.day);
+                    } else if (target.dataset.all !== undefined) {
+                        var row = rows[target.dataset.all];
+                        row.days = row.days.length === 7 ? [] : DAYS.slice();
+                    } else if (target.dataset.remove !== undefined) {
+                        rows.splice(+target.dataset.remove, 1);
+                    } else {
+                        return;
+                    }
+                    render();
+                });
+                body.addEventListener('change', function (event) {
+                    if (event.target.dataset.row === undefined || !event.target.value) return;
+                    rows[event.target.dataset.row].time = event.target.value;
+                    sortMerge();
+                    render();
+                });
+                document.querySelectorAll('.day-head').forEach(function (button) {
+                    button.addEventListener('click', function () {
+                        var day = +button.dataset.day;
+                        var allOn = rows.length && rows.every(function (row) { return row.days.indexOf(day) >= 0; });
+                        rows.forEach(function (row) { toggle(row.days, day, !allOn); });
+                        render();
+                    });
+                });
+                function add() {
+                    var input = document.getElementById('new-time');
+                    var note = document.getElementById('add-note');
+                    if (!input.value) { note.textContent = 'Choose the time first.'; input.focus(); return; }
+                    var exists = rows.some(function (row) { return row.time === input.value; });
+                    rows.push({time: input.value, days: DAYS.slice()});
+                    note.textContent = exists ? input.value + ' was already there: now every day.' : '';
+                    sortMerge();
+                    input.value = '';
+                    render();
+                }
+                document.getElementById('add-time').addEventListener('click', add);
+                document.getElementById('new-time').addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') { event.preventDefault(); add(); }
+                });
                 document.querySelectorAll('[data-preset]').forEach(function (button) {
                     button.addEventListener('click', function () {
-                        inputs.forEach(function (input) { input.value = button.dataset.preset; });
-                        explain();
+                        rows = button.dataset.preset.split(' ').map(function (time) { return {time: time, days: DAYS.slice()}; });
+                        render();
                     });
                 });
-                document.querySelectorAll('[data-copy]').forEach(function (button) {
-                    button.addEventListener('click', function () {
-                        var value = document.querySelector('.day-times[data-day="' + button.dataset.copy + '"]').value;
-                        inputs.forEach(function (input) { input.value = value; });
-                        explain();
+                var form = document.getElementById('schedule-form');
+                var saving = false;
+                form.addEventListener('submit', function () {
+                    saving = true;
+                    DAYS.forEach(function (d) {
+                        document.getElementById('day_' + d).value = rows.filter(function (row) {
+                            return row.days.indexOf(d) >= 0;
+                        }).map(function (row) { return row.time; }).join(' ');
                     });
                 });
-                document.querySelectorAll('[data-copy-weekdays]').forEach(function (button) {
-                    button.addEventListener('click', function () {
-                        var value = document.querySelector('.day-times[data-day="' + button.dataset.copyWeekdays + '"]').value;
-                        inputs.forEach(function (input) { if (input.dataset.day <= 5) input.value = value; });
-                        explain();
-                    });
+                window.addEventListener('beforeunload', function (event) {
+                    if (!saving && state() !== initial) event.preventDefault();
                 });
-                inputs.forEach(function (input) { input.addEventListener('input', explain); });
-                explain();
+                render();
             })();
         </script>
     {% endif %}

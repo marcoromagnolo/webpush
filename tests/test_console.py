@@ -65,3 +65,20 @@ def test_default_schedule():
     # the 5 best times every day: 35 slots a week, created with every site
     assert webapp.DEFAULT_TIMES == ((7, 30), (12, 30), (15, 30), (18, 30), (21, 0))
     assert len(webapp.DEFAULT_SLOTS) == 35 and {d for d, _, _ in webapp.DEFAULT_SLOTS} == set(range(1, 8))
+
+
+def test_schedule_grid():
+    slots = [{'day': d, 'hour': 7, 'minute': 30} for d in (1, 2)] + [{'day': 3, 'hour': 21, 'minute': 0}]
+    assert webapp.schedule_grid(slots) == [{'time': '07:30', 'days': [1, 2]}, {'time': '21:00', 'days': [3]}]
+    # after an error: from the form, invalid times left out
+    form = {'day_1': '21:00 7:30', 'day_6': 'noon 21:00'}
+    assert webapp.schedule_grid([], form) == [{'time': '07:30', 'days': [1]}, {'time': '21:00', 'days': [1, 6]}]
+
+
+def test_next_slot():
+    from datetime import datetime
+    slots = [{'day': 1, 'hour': 7, 'minute': 30}, {'day': 3, 'hour': 21, 'minute': 0}]
+    monday = datetime(2026, 10, 12, 7, 30)  # a Monday, at the time of a slot: the next one
+    assert webapp.next_slot(slots, monday) == (3, '21:00')
+    assert webapp.next_slot(slots, datetime(2026, 10, 15, 8, 0)) == (1, '07:30')  # Thursday: next week
+    assert webapp.next_slot([], monday) is None

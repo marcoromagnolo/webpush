@@ -5,8 +5,7 @@
 #   POST   /sites/<code>/subscriptions      subscribe a browser (PushSubscription.toJSON())
 #   DELETE /sites/<code>/subscriptions      unsubscribe a browser
 #   POST   /sites/<code>/clicks             click on a notification (service worker)
-# With a token ("Authorization: Bearer <token>", generated in the console, page API tokens), for the site of the
-# token or every site:
+# With a token ("Authorization: Bearer <token>", generated in the console, page API tokens), of the site:
 #   POST   /sites/<code>/messages           queue a message
 #   GET    /sites/<code>/messages/<id>      a message, its status and its deliveries
 #   DELETE /sites/<code>/messages/<id>      cancel a queued message
@@ -69,7 +68,7 @@ def site_origins(site):
 
 
 def token_required(view):
-    """A valid token for the site of the request (g.site) or for every site: g.api_token."""
+    """A valid token of the site of the request (g.site): g.api_token."""
     @wraps(view)
     def decorated(*args, **kwargs):
         scheme, _, token = request.headers.get('Authorization', '').partition(' ')
@@ -82,7 +81,7 @@ def token_required(view):
             logger.warning(f"Invalid API token from ip: {request.remote_addr}")
             return error(401, 'Invalid, expired or revoked token')
         site = g.get('site')
-        if site is not None and api_token['site_id'] not in (None, site['id']):
+        if site is not None and api_token['site_id'] != site['id']:
             return error(403, f"The token is not valid for the site {site['code']}")
         g.api_token = api_token
         return view(*args, **kwargs)

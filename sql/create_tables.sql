@@ -120,7 +120,7 @@ create table if not exists user(
 create table if not exists api_token(
 	id int auto_increment,
 	name varchar(100) not null,  -- client
-	site_id int null default null,  -- null: every site
+	site_id int not null,  -- a token works for its site only
 	token_hash char(64) not null,
 	token_prefix varchar(16) not null,  -- first characters, to recognize the token
 	created_at timestamp not null default current_timestamp,

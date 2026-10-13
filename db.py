@@ -603,7 +603,7 @@ def clean_ip_blacklist(limit_time: datetime):
 
 # API tokens
 
-def create_api_token(name, token_hash, token_prefix, user_id, site_id=None, expires_at=None):
+def create_api_token(name, token_hash, token_prefix, user_id, site_id, expires_at=None):
     with cursor(commit=True) as c:
         c.execute("INSERT INTO api_token (name, site_id, token_hash, token_prefix, created_at, created_by, expires_at)"
                   " VALUES (%s, %s, %s, %s, %s, %s, %s)",
@@ -658,7 +658,8 @@ def error_log_where(filters):
         conditions.append("e.resolved = %s")
         params.append(filters.get('status', 'open') == 'resolved')
     if filters.get('site_id'):
-        conditions.append("e.site_id = %s")
+        # the errors without a site (console, API, start) concern every site: always shown
+        conditions.append("(e.site_id = %s OR e.site_id IS NULL)")
         params.append(filters['site_id'])
     if filters.get('message'):
         conditions.append("e.message_id = %s")
@@ -681,8 +682,8 @@ def get_error_logs(filters, limit, offset=0):
 
 
 def count_open_errors(site_id=None):
-    """Open errors by phase, e.g. {'push': 3, 'app': 1}."""
-    where, params = site_where(site_id)
+    """Open errors by phase, e.g. {'push': 3, 'app': 1}: of the site and without a site (as the page Errors)."""
+    where, params = (" AND (site_id = %s OR site_id IS NULL)", (site_id,)) if site_id else ("", ())
     with cursor() as c:
         c.execute(f"SELECT phase, COUNT(*) AS n FROM error_log WHERE resolved = false{where} GROUP BY phase", params)
         return {row['phase']: row['n'] for row in c.fetchall()}
