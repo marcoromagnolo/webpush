@@ -1,0 +1,15 @@
+{# Site of the page, at the top of the pages with the data of the sites. The choice is kept (cookie) for the other
+   pages. allow_all: the option All sites (Home, Errors); the other pages show always one site (page_site) #}
+{% set selected = page_site if page_site is defined else current_site() %}
+<form class="site-filter d-flex align-items-center gap-2" method="GET" action="{{ url_for('select_site') }}">
+    <input type="hidden" name="next" value="{{ url_for(request.endpoint, status=request.args.get('status')) }}">
+    <label class="small text-muted mb-0" for="site-filter">Site</label>
+    <select class="form-select form-select-sm fw-semibold" id="site-filter" name="site" onchange="this.form.submit()"
+            title="{{ 'The data of this site, or of all the sites' if allow_all else 'Every site has its messages, subscribers and schedule: the data of this site' }}">
+        {% if allow_all %}<option value="">All sites</option>{% endif %}
+        {% for s in all_sites() %}
+            <option value="{{ s.code }}" {% if selected and selected.id == s.id %}selected{% endif %}>{{ s.name }}{{ ' (disabled)' if not s.enabled }}</option>
+        {% endfor %}
+    </select>
+    <noscript><button class="btn btn-sm btn-outline-secondary" type="submit">Go</button></noscript>
+</form>

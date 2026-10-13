@@ -32,19 +32,9 @@
 
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label" for="site_id">Site{{ info("Site whose subscribers receive the message: it goes in the queue of that site.") }}</label>
-                                {% if message %}
-                                    <input class="form-control" type="text" value="{{ message.site_name }}" disabled>
-                                {% else %}
-                                    <select class="form-select" id="site_id" name="site_id" required>
-                                        {% if not site %}<option value="">Choose the site</option>{% endif %}
-                                        {% for s in sites %}
-                                            <option value="{{ s.id }}" data-icon="{{ s.default_icon or '' }}" data-badge="{{ s.default_badge or '' }}"
-                                                    data-host="{{ s.url.split('/')[2] if s.url.count('/') >= 2 else s.url }}"
-                                                    {% if site and site.id == s.id %}selected{% endif %}>{{ s.name }}</option>
-                                        {% endfor %}
-                                    </select>
-                                {% endif %}
+                                <label class="form-label" for="site_id">Site{{ info("Site whose subscribers receive the message: it goes in the queue of that site. A new message is of the site chosen in the pages (Messages > Site).") }}</label>
+                                <input class="form-control" type="text" id="site_id" value="{{ site.name }}" disabled>
+                                {% if not message %}<input type="hidden" name="site_id" value="{{ site.id }}">{% endif %}
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="send_after">Send after <span class="text-muted small">(optional)</span>{{ info("Optional: the message is not sent before this date and time (local time of the server). Until then the next messages of the queue go ahead.") }}</label>
@@ -237,13 +227,11 @@
     (function () {
         var form = document.getElementById('message-form');
         var preview = document.getElementById('preview');
-        var site = document.getElementById('site_id');
         function value(name) {
             var field = form.elements[name];
             return field ? field.value.trim() : '';
         }
         function siteData(name) {
-            if (site && site.selectedOptions.length) return site.selectedOptions[0].dataset[name] || '';
             return preview.dataset[name] || '';
         }
         function setImage(element, src) {
@@ -272,7 +260,6 @@
             actions.style.display = actions.children.length ? '' : 'none';
         }
         form.addEventListener('input', render);
-        if (site) site.addEventListener('change', render);
         render();
     })();
 </script>

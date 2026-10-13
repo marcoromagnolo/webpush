@@ -3,7 +3,7 @@
 <body>
 {% include 'header.html' %}
 <main class="dashboard">
-    {% set site = current_site() %}
+    {% set site = page_site %}
     {% set queue = filters.status == 'queued' %}
 
     {% if error %}
@@ -12,10 +12,14 @@
         <div class="alert alert-success">{{ message }}</div>
     {% endif %}
 
+    <div class="page-bar">
+        {% include 'site_filter.html' %}
+    </div>
+
     <section>
         <div class="card">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <h3 class="h5 mb-0">Messages {% if site %}<span class="text-muted small">{{ site.name }}</span>{% endif %}</h3>
+                <h3 class="h5 mb-0">Messages <span class="text-muted small">{{ site.name }}</span></h3>
                 <div class="d-flex flex-wrap align-items-center gap-2">
                     {% with refresh_key = 'messages' %}{% include 'refresh_control.html' %}{% endwith %}
                     <a class="btn btn-sm btn-success" href="{{ url_for('message_new') }}">New message</a>
@@ -44,7 +48,7 @@
             {% if queue %}
                 <div class="card-body border-bottom small text-muted">
                     The queue in sending order: at every slot of the schedule the first message is sent to a share of the
-                    subscribers ({% if site %}<a href="{{ url_for('schedules') }}">schedule of {{ site.name }}</a>{% else %}see Schedules{% endif %}).
+                    subscribers (<a href="{{ url_for('schedules') }}">schedule of {{ site.name }}</a>).
                     A message with <i>Send after</i> waits for its time, the next ones go ahead.
                     <b>Send now</b> sends it at once to all the subscribers of the site.
                 </div>
@@ -59,7 +63,6 @@
                     <tr>
                         {% if queue %}<th scope="col" class="text-center">#</th>{% endif %}
                         <th scope="col">Message</th>
-                        {% if not site %}<th scope="col">Site</th>{% endif %}
                         <th scope="col">{{ 'Created' if queue else 'Sent' }}</th>
                         {% if not queue %}
                             <th scope="col" class="text-end" title="delivered / sent">Delivered</th>

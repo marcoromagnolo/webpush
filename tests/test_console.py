@@ -82,3 +82,16 @@ def test_next_slot():
     assert webapp.next_slot(slots, monday) == (3, '21:00')
     assert webapp.next_slot(slots, datetime(2026, 10, 15, 8, 0)) == (1, '07:30')  # Thursday: next week
     assert webapp.next_slot([], monday) is None
+
+
+def test_page_site(monkeypatch):
+    sites = [{'id': 2, 'name': 'A news'}, {'id': 1, 'name': 'B news'}]
+    monkeypatch.setattr(webapp.db, 'get_sites', lambda enabled_only=False: sites)
+    with webapp.app.test_request_context('/messages'):
+        monkeypatch.setattr(webapp, 'current_site', lambda: None)
+        assert webapp.page_site() == sites[0]  # All sites: the first site, never the data of all the sites
+        monkeypatch.setattr(webapp, 'current_site', lambda: sites[1])
+        assert webapp.page_site() == sites[1]
+    monkeypatch.setattr(webapp.db, 'get_sites', lambda enabled_only=False: [])
+    monkeypatch.setattr(webapp, 'current_site', lambda: None)
+    assert webapp.page_site() is None

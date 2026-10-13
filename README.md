@@ -6,7 +6,8 @@ the messages are queued (console or REST API) and sent at the times of the sched
 
 * **Console** (web app): Home with the counters and today's sendings, Messages (queue, editor with preview, send now,
   test), Subscribers, Schedules, Sites (settings, VAPID keys, integration code, test browsers), API tokens,
-  IP blacklist, Errors. The menu chooses the site of the pages (or all the sites).
+  IP blacklist, Errors. Messages, Subscribers and Schedules show always one site, chosen at the top of the page
+  (Site): the sites stay apart. Home and Errors show one site or all the sites.
 * **REST API** `/api/v1/sites/<code>/...`: the browsers subscribe (public, only from the origins of the site), the CMS
   of the sites queue the messages (with a token).
 * **Scheduler**: at every slot of the schedule of a site (default the 5 best times of the day) the first message of
@@ -172,7 +173,7 @@ From zero to a notification received by your browser. Port **8090**: 8080 is oft
    | Generate new VAPID keys | checked |
 
    The site is created with its VAPID keys and the default schedule (every day 07:30 12:30 15:30 18:30 21:00, changed
-   in the page Schedules), and becomes the site of the menu (every page shows its data).
+   in the page Schedules), and becomes the site of the pages (Site, at the top of the pages).
 
 8. **A real notification in the browser**: **Sites > Demo > Test page** (or the button *Test page* in the list of the
    sites). It is a page of the console with the code of **Integration** (`webpush-client.js`, `webpush-sw.js`, public

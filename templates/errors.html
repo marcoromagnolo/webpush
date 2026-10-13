@@ -8,6 +8,10 @@
         <div class="alert alert-success">{{ notice }}</div>
     {% endif %}
 
+    <div class="page-bar">
+        {% with allow_all = true %}{% include 'site_filter.html' %}{% endwith %}
+    </div>
+
     <section>
         <div class="card">
             <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">

@@ -90,6 +90,16 @@ def current_site():
     return g.current_site
 
 
+def page_site():
+    """Site of the pages of one site (Messages, Subscribers, Schedules): the chosen one or, with All sites, the first
+    site. None only without sites."""
+    site = current_site()
+    if site is None:
+        sites = db.get_sites()
+        site = sites[0] if sites else None
+    return site
+
+
 def site_id_filter():
     site = current_site()
     return site['id'] if site else None
@@ -332,7 +342,7 @@ def safe_next(target, default):
 @app.route('/select-site', methods=['GET'])
 @jwt_required()
 def select_site():
-    """Site of the menu: every page shows its data (empty = all the sites)."""
+    """Site of the pages (site_filter.html), kept in a cookie (empty = all the sites, Home and Errors)."""
     code = request.args.get('site', '')
     response = redirect(safe_next(request.args.get('next'), url_for('index')))
     if code and db.get_site(code=code):
@@ -368,23 +378,26 @@ def index():
 
 # Messages
 
-def message_filters():
+def message_filters(site):
     status = request.args.get('status', 'queued')
-    return {'site_id': site_id_filter(), 'status': status if status in MESSAGE_STATUSES else None,
+    return {'site_id': site['id'], 'status': status if status in MESSAGE_STATUSES else None,
             'q': request.args.get('q', '').strip()[:200]}
 
 
 @app.route("/messages", methods=["GET"])
 @jwt_required()
 def messages():
-    filters = message_filters()
+    site = page_site()
+    if site is None:
+        return redirect(url_for('index'))
+    filters = message_filters(site)
     _, total = db.get_messages(filters, 1)
     pages = paginate(total)
     rows, _ = db.get_messages(filters, pages['records_per_page'], pages['offset'])
     for row in rows:
         row['options_dict'] = json.loads(row['options']) if row['options'] else {}
     return render_template("messages.html", title="Messages", messages=rows, filters=filters, paginate=pages,
-                           counts=db.count_messages_by_status(site_id_filter()), current_route='messages',
+                           page_site=site, counts=db.count_messages_by_status(site['id']), current_route='messages',
                            records_name='messages', args=list_args('status', 'q', 'records'),
                            message=request.args.get('message'), error=request.args.get('error'))
 
@@ -455,10 +468,8 @@ def parse_local_datetime(value):
 
 
 def message_form_page(message, form, error=None, site=None):
-    sites = db.get_sites()
-    preview_site = site or current_site() or (sites[0] if sites else None)
     return render_template("message_form.html", title="Messages", message=message, form=form, error=error,
-                           sites=sites, site=site, preview_site=preview_site,
+                           site=site, preview_site=site,
                            deliveries=db.get_deliveries(message_id=message['id'], limit=100) if message else [],
                            test_subscribers=db.get_test_subscribers(message['site_id']) if message else [],
                            notice=request.args.get('message'), action_error=request.args.get('error'),
@@ -468,7 +479,10 @@ def message_form_page(message, form, error=None, site=None):
 @app.route("/messages/new", methods=["GET", "POST"])
 @jwt_required()
 def message_new():
-    site = current_site()
+    # a new message is of the site of the page (a copy: of the site of the message)
+    site = page_site()
+    if site is None:
+        return redirect(url_for('index'))
     if request.method == 'GET':
         # Duplicate: the form of a copy of a message
         source = db.get_message(request.args.get('copy', type=int)) if request.args.get('copy') else None
@@ -477,10 +491,10 @@ def message_new():
             form['send_after'] = ''
         return message_form_page(None, form, site=db.get_site(source['site_id']) if source else site)
     form = request.form.to_dict()
-    site = db.get_site(request.form.get('site_id', type=int)) if request.form.get('site_id') else site
+    site = db.get_site(request.form.get('site_id', type=int))
     try:
         if site is None:
-            raise ValueError("Choose the site")
+            raise ValueError("Unknown site")
         title, options = form_to_message(request.form)
         send_after = parse_local_datetime(form.get('send_after'))
     except ValueError as e:
@@ -555,20 +569,23 @@ def message_action(message_id):
 @app.route("/subscribers", methods=["GET"])
 @jwt_required()
 def subscribers():
+    site = page_site()
+    if site is None:
+        return redirect(url_for('index'))
     status = request.args.get('status', 'active')
-    filters = {'site_id': site_id_filter(), 'status': status if status in db.SUBSCRIBER_STATUSES else 'active',
+    filters = {'site_id': site['id'], 'status': status if status in db.SUBSCRIBER_STATUSES else 'active',
                'service': request.args.get('service', '')[:100]}
     _, total = db.get_subscribers(filters, 1)
     pages = paginate(total)
     rows, _ = db.get_subscribers(filters, pages['records_per_page'], pages['offset'])
     for row in rows:
         row['service'] = db.push_service_of(row['endpoint'])[1]
-    growth = db.get_subscriber_growth(site_id_filter(), 30)
+    growth = db.get_subscriber_growth(site['id'], 30)
     return render_template("subscribers.html", title="Subscribers", subscribers=rows, filters=filters, paginate=pages,
-                           statuses=db.SUBSCRIBER_STATUSES, services=db.get_push_services(site_id_filter()),
+                           page_site=site, statuses=db.SUBSCRIBER_STATUSES, services=db.get_push_services(site['id']),
                            growth=growth, growth_max=max([day['active'] for day in growth] + [1]),
                            current_route='subscribers', records_name='subscribers',
-                           args=list_args('status', 'service', 'records'), stats=db.get_stats(site_id_filter()))
+                           args=list_args('status', 'service', 'records'), stats=db.get_stats(site['id']))
 
 
 @app.route("/subscribers/<int:subscriber_id>/remove", methods=["POST"])
@@ -633,11 +650,13 @@ def next_slot(slots, now=None):
 @app.route("/schedules", methods=["GET", "POST"])
 @jwt_required()
 def schedules():
-    site = current_site()
+    site = page_site()
     if site is None:
-        return render_template("schedules.html", title="Schedules", site=None, sites=db.get_sites_summary())
+        return redirect(url_for('index'))
     error, form = None, None
     if request.method == 'POST':
+        # the site of the form (the site of the page may have changed in another tab)
+        site = db.get_site(request.form.get('site_id', type=int)) or site
         form = request.form.to_dict()
         try:
             slots = []
@@ -656,7 +675,7 @@ def schedules():
             logger.info(f"Schedule of {site['code']} saved: {len(slots)} slots a week")
             return redirect(url_for('schedules', message='Schedule saved'))
     slots = db.get_slots(site['id'])
-    return render_template("schedules.html", title="Schedules", site=site, error=error,
+    return render_template("schedules.html", title="Schedules", site=site, page_site=site, error=error,
                            grid=schedule_grid(slots, form), next_slot=next_slot(slots), today=datetime.now().isoweekday(),
                            message=request.args.get('message'),
                            queued=db.count_messages_by_status(site['id'])['queued']), (400 if error else 200)

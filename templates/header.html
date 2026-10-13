@@ -1,5 +1,4 @@
 <header>
-    {% set site = current_site() %}
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('index') }}">WebPush</a>
@@ -8,18 +7,6 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
-                <!-- Site of the pages: every page shows the data of the chosen site, or of all the sites -->
-                <form class="site-select me-lg-3 my-2 my-lg-0" method="GET" action="{{ url_for('select_site') }}">
-                    <input type="hidden" name="next" value="{{ back_url() }}">
-                    <select class="form-select form-select-sm" name="site" aria-label="Site" onchange="this.form.submit()"
-                            title="The pages show the data of this site">
-                        <option value="">All sites</option>
-                        {% for s in all_sites() %}
-                            <option value="{{ s.code }}" {% if site and site.id == s.id %}selected{% endif %}>{{ s.name }}{{ ' (disabled)' if not s.enabled }}</option>
-                        {% endfor %}
-                    </select>
-                    <noscript><button class="btn btn-sm btn-outline-secondary" type="submit">Go</button></noscript>
-                </form>
                 <div class="navbar-nav">
                     <a class="nav-link {% if title == 'Home' %} active {% endif %}" href="{{ url_for('index') }}">Home</a>
                     <a class="nav-link {% if title == 'Messages' %} active {% endif %}" href="{{ url_for('messages') }}">Messages</a>

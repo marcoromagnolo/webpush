@@ -19,7 +19,8 @@
     {% endif %}
 
     <!-- Automatic refresh of counters, sites, today, sendings and errors -->
-    <div class="d-flex justify-content-end mb-2">
+    <div class="page-bar">
+        {% with allow_all = true %}{% include 'site_filter.html' %}{% endwith %}
         {% with refresh_key = 'home' %}{% include 'refresh_control.html' %}{% endwith %}
     </div>
 

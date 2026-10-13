@@ -3,14 +3,18 @@
 <body>
 {% include 'header.html' %}
 <main class="dashboard">
-    {% set site = current_site() %}
+    {% set site = page_site %}
+
+    <div class="page-bar">
+        {% include 'site_filter.html' %}
+    </div>
 
     <div class="row g-3" data-refresh-box="stats">
         <!-- Active subscribers per day: one series, the table below is the same data -->
         <section class="col-lg-8 mb-0">
             <div class="card h-100">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <h3 class="h5 mb-0">Active subscribers <span class="text-muted small">last 30 days{% if site %}, {{ site.name }}{% endif %}</span></h3>
+                    <h3 class="h5 mb-0">Active subscribers <span class="text-muted small">last 30 days, {{ site.name }}</span></h3>
                     <span class="small text-muted">{{ stats.active }} now &middot; +{{ stats.new_week }} / -{{ stats.removed_week }} in 7 days</span>
                 </div>
                 <div class="card-body">
@@ -97,7 +101,6 @@
                     <thead>
                     <tr>
                         <th scope="col">#</th>
-                        {% if not site %}<th scope="col">Site</th>{% endif %}
                         <th scope="col">Browser</th>
                         <th scope="col">Subscribed</th>
                         <th scope="col">Last delivered</th>
@@ -110,7 +113,6 @@
                     {% for s in subscribers %}
                         <tr class="{{ 'text-muted' if s.removed_at }}">
                             <td class="small">{{ s.id }}</td>
-                            {% if not site %}<td class="small">{{ s.site_name }}</td>{% endif %}
                             <td class="small">
                                 {{ s.service }}
                                 {% if s.user_agent %}<div class="text-muted text-truncate" style="max-width: 28rem;" title="{{ s.user_agent }}">{{ s.user_agent }}</div>{% endif %}
@@ -137,7 +139,7 @@
                         </tr>
                     {% else %}
                         <tr><td colspan="8" class="text-muted p-4 text-center">No subscriber.
-                            {% if site %}Add the code of <a href="{{ url_for('site_edit', site_id=site.id) }}#integration">Integration</a> to the site.{% endif %}</td></tr>
+                            Add the code of <a href="{{ url_for('site_edit', site_id=site.id) }}#integration">Integration</a> to the site.</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
