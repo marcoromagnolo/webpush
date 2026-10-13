@@ -483,38 +483,57 @@ Upgrade from the single site version
 ====================================
 
 The database of the single site version (tables `messages`, `subscribers`, `schedules`, `log_messages`) is moved to the
-multi site tables with its site, by `sql/upgrade_2026-10-12_multisite.sql`. On a backup first:
+multi site tables with its site, by `sql/upgrade_2026-10-12_multisite.sql`: the subscribers and the queue are kept.
+It replaces step 3 (*Tables*) of *Server installation*; the other steps are the same. On the server, in the shell of
+the user `webpush` (`sudo -iu webpush`; the account `webpush` of MariaDB connects without password, *Server setup*,
+step 3), after steps 1 and 2 of *Server installation*:
 
-1. Stop the old application (`./stop.sh` of the old version) and back up the database:
+1. Stop the old application (`./stop.sh` in the directory of the old version) and back up the database in
+   `/srv/webpush`:
 
-       sudo mariadb-dump webpush > webpush-backup-$(date +%F).sql
+       mariadb-dump webpush > /srv/webpush/webpush-backup-$(date +%F).sql
+       ls -lh /srv/webpush/webpush-backup-*.sql
 
-2. The MariaDB user of the app and `.env`: step 3 of *Local installation* (or 2 of *Server installation*). The block
-   keeps the existing database; then in `.env`: `DEFAULT_SITE=<code of the site>` (the old endpoints keep working).
-3. Edit the values at the top of `sql/upgrade_2026-10-12_multisite.sql` (code, name, url, contact of the site), then:
+2. Site of the old data: edit the values at the top of the script (code, name, url, contact), and in `.env`
+   `DEFAULT_SITE=<the same code>` (the old endpoints `/subscription/` and `/push_message/` keep working):
 
-       sudo mariadb webpush < sql/create_tables.sql
-       sudo mariadb webpush < sql/upgrade_2026-10-12_multisite.sql
+       nano /srv/webpush/app/sql/upgrade_2026-10-12_multisite.sql
+       nano /srv/webpush/app/.env
 
-   (on the server `mariadb` without sudo). The last query shows the counts of the old and the new tables. Duplicated
-   subscriptions are merged (the most recent keys), the queue keeps its order, the old tables are renamed `*_old`
-   (drop them when everything works).
-4. Start: `./docker-start.sh`.
+3. New tables and move of the data:
+
+       cd /srv/webpush/app
+       mariadb webpush < sql/create_tables.sql
+       mariadb webpush < sql/upgrade_2026-10-12_multisite.sql
+
+   The last query shows the counts of the old and the new tables. Duplicated subscriptions are merged (the most
+   recent keys), the queue keeps its order, the old tables are renamed `*_old` (drop them when everything works).
+
+4. Start (step 4 of *Server installation*):
+
+       /srv/webpush/app/docker-start.sh
+
 5. Import the VAPID keys of the old installation, so that the browsers already subscribed keep working: console
-   **Sites > the site > Keys > Import** with the content of `private_key.txt` and `public_key.txt`, or in the container
-   (`log/` is mounted in `/app/log`):
+   **Sites > the site > Keys > Import** with the content of `private_key.txt` and `public_key.txt` of the old
+   version, or in the container (`/srv/webpush/app/log` is mounted in `/app/log`; `<old>` is the directory of the
+   old version):
 
-       cp private_key.txt public_key.txt log/
+       cp <old>/private_key.txt <old>/public_key.txt /srv/webpush/app/log/
        docker exec webpush python vapid.py import <code> log/private_key.txt log/public_key.txt
-       rm log/private_key.txt log/public_key.txt
+       rm /srv/webpush/app/log/private_key.txt /srv/webpush/app/log/public_key.txt
 
 6. `POST /push_message/` now needs an API token (`Authorization: Bearer ...`, page **API tokens**): update the CMS.
    `GET/POST /subscription/` work as before.
 7. Move the site to the new client when possible (*Integration in a site*): `webpush-sw.js` replaces the old service
    worker (same scope, the subscriptions are kept) and adds click tracking and the renewal of the subscriptions.
 
-Back: stop the container, restore the backup on an empty database (`sudo mariadb webpush < webpush-backup-....sql`)
-and start the old version of the code.
+Back: stop the container (`/srv/webpush/app/docker-stop.sh`), restore the backup on an empty database and start the
+old version of the code:
+
+    mariadb -e "DROP DATABASE webpush; CREATE DATABASE webpush DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;"
+    mariadb webpush < /srv/webpush/webpush-backup-YYYY-MM-DD.sql
+
+In local the same steps run in `~/Projects/webpush`, with `sudo mariadb` instead of `mariadb`.
 
 Updates
 =======
@@ -522,7 +541,7 @@ Updates
 Update an installation to the last version of the repository, as its owner (on the server, `sudo -iu webpush`
 first):
 
-    cd /srv/webpush/app                                # or ~/Projects/webpush
+    cd /srv/webpush/app                                # in local: cd ~/Projects/webpush
     old=$(git rev-parse HEAD)
     git pull --ff-only                                 # or gh repo sync
     git diff --name-only "$old" HEAD -- sql/upgrade_   # database upgrades to run, if any
@@ -621,7 +640,8 @@ the footer, invitation banner, service worker served by WordPress): theme `npx_v
 Operations
 ==========
 
-As the owner of the installation:
+On the server in the shell of the user `webpush` (`sudo -iu webpush`, then `cd /srv/webpush/app`; in local in
+`~/Projects/webpush`):
 
     docker logs -f webpush                  # container output (dependency install at the first start)
     tail -f log/app.log                     # application; also log/notifier.log, log/scheduler.log, log/api.log
@@ -634,9 +654,11 @@ As the owner of the installation:
 
 * The errors are also in the page **Errors** (kept `ERROR_LOG_RETENTION_DAYS` days).
 * Locked out by the ip blacklist (3 failed logins: 60 minutes):
-  `sudo mariadb webpush -e "DELETE FROM ip_blacklist WHERE remote_address = '<ip>'"`
-* Forgotten password: `sudo mariadb webpush -e "DELETE FROM user"`, the next access opens **Setup** again.
-* Backup: `sudo mariadb-dump webpush > webpush-$(date +%F).sql`
+  `mariadb webpush -e "DELETE FROM ip_blacklist WHERE remote_address = '<ip>'"`
+* Forgotten password: `mariadb webpush -e "DELETE FROM user"`, the next access opens **Setup** again.
+* Backup: `mariadb-dump webpush > /srv/webpush/webpush-$(date +%F).sql`
+
+(as the user `webpush` on the server; in local `sudo mariadb`, `sudo mariadb-dump`)
 
 VAPID keys
 ==========
