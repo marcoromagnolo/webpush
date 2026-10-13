@@ -606,7 +606,6 @@ def schedule_summary(site, slots):
         'per_day': per_day,
         'slots_week': len(slots),
         'max_per_day': max(counts) if counts else 0,
-        'partitions': {day: max(1, -(-len(v) // max(1, site['messages_per_day']))) for day, v in per_day.items()},
     }
 
 
@@ -620,22 +619,20 @@ def schedules():
     if request.method == 'POST':
         form = request.form.to_dict()
         try:
-            messages_per_day = request.form.get('messages_per_day', type=int)
-            if not messages_per_day or not 1 <= messages_per_day <= 24:
-                raise ValueError("Messages per subscriber a day: from 1 to 24")
             slots = []
             for day in scheduler.DAY_LABELS:
                 try:
                     slots += [(day, h, m) for h, m in parse_times(request.form.get(f'day_{day}', ''))]
                 except ValueError as e:
                     raise ValueError(f"{scheduler.DAY_LABELS[day]}: {e}")
+            if not slots:
+                raise ValueError("The schedule can't be empty: to stop the sendings disable the site (page Sites)")
         except ValueError as e:
             error = str(e)
         else:
-            db.set_messages_per_day(site['id'], messages_per_day)
             db.replace_slots(site['id'], slots)
             scheduler.reload()
-            logger.info(f"Schedule of {site['code']} saved: {len(slots)} slots, {messages_per_day} messages a day")
+            logger.info(f"Schedule of {site['code']} saved: {len(slots)} slots a week")
             return redirect(url_for('schedules', message='Schedule saved'))
     slots = db.get_slots(site['id'])
     return render_template("schedules.html", title="Schedules", site=site, form=form, error=error,
@@ -645,7 +642,11 @@ def schedules():
 
 # Sites
 
-DEFAULT_SLOTS = [(day, hour, 0) for day in range(1, 8) for hour in range(8, 23)]
+# the best times of the day for a notification (breakfast and commute, lunch break, afternoon, way home, after
+# dinner): every slot sends the next message of the queue to all the subscribers
+DEFAULT_TIMES = ((7, 30), (12, 30), (15, 30), (18, 30), (21, 0))
+DEFAULT_SLOTS = [(day, hour, minute) for day in range(1, 8) for hour, minute in DEFAULT_TIMES]
+app.jinja_env.globals['DEFAULT_TIMES_TEXT'] = ' '.join(f"{h:02}:{m:02}" for h, m in DEFAULT_TIMES)
 
 
 def form_to_site(form, site=None):
@@ -658,7 +659,6 @@ def form_to_site(form, site=None):
                                      if line.strip()) or None,
         'enabled': form.get('enabled') == 'on',
         'vapid_sub': form.get('vapid_sub', '').strip(),
-        'messages_per_day': form.get('messages_per_day', type=int),
         'ttl_seconds': (form.get('ttl_hours', type=int) or 0) * 3600,
         'default_icon': form.get('default_icon', '').strip() or None,
         'default_badge': form.get('default_badge', '').strip() or None,
@@ -680,8 +680,6 @@ def form_to_site(form, site=None):
             raise ValueError(f"Allowed origins: '{origin}' is not an origin (scheme://host[:port])")
     if not re.match(r"^(mailto:[^@\s]+@[^@\s]+|https://\S+)$", values['vapid_sub']):
         raise ValueError("Contact: mailto:address or https url (the push services use it to contact you)")
-    if not values['messages_per_day'] or not 1 <= values['messages_per_day'] <= 24:
-        raise ValueError("Messages per subscriber a day: from 1 to 24")
     if not 3600 <= values['ttl_seconds'] <= 28 * 24 * 3600:
         raise ValueError("Time to live: from 1 to 672 hours (28 days)")
     return values
@@ -696,7 +694,7 @@ def sites():
 @app.route("/sites/new", methods=["GET", "POST"])
 @jwt_required()
 def site_new():
-    form = {'enabled': True, 'messages_per_day': 3, 'ttl_hours': 24, 'generate_keys': True, 'default_schedule': True}
+    form = {'enabled': True, 'ttl_hours': 24, 'generate_keys': True}
     error = None
     if request.method == 'POST':
         form = request.form.to_dict()
@@ -708,8 +706,8 @@ def site_new():
             site_id = db.create_site(values)
             if request.form.get('generate_keys') == 'on':
                 db.set_site_keys(site_id, *vapid.generate())
-            if request.form.get('default_schedule') == 'on':
-                db.replace_slots(site_id, DEFAULT_SLOTS)
+            # the schedule is always there (page Schedules): the default times
+            db.replace_slots(site_id, DEFAULT_SLOTS)
             scheduler.reload()
             logger.info(f"Site {values['code']} created by {current_user()['username']}")
             response = redirect(url_for('site_edit', site_id=site_id, message='Site created: add the code of the tab Integration to the site'))

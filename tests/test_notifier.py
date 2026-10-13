@@ -7,16 +7,38 @@ import notifier
 import vapid
 
 
-@pytest.mark.parametrize('day_slots, slot, per_day, expected', [
-    ([(8, 0), (9, 0), (10, 0)], (9, 0), 3, (0, 1)),  # 3 slots, 3 messages: everybody at every slot
-    ([(h, 0) for h in range(8, 23)], (8, 0), 3, (0, 5)),  # 15 slots, 3 messages: 5 partitions
-    ([(h, 0) for h in range(8, 23)], (13, 0), 3, (0, 5)),  # the 6th slot: the first partition again
-    ([(h, 0) for h in range(8, 23)], (14, 0), 3, (1, 5)),
-    ([(8, 0), (9, 30), (12, 0)], (9, 30), 2, (1, 2)),
-    ([(8, 0)], (9, 0), 3, None),  # not a slot of the day
-])
-def test_partition_for_slot(day_slots, slot, per_day, expected):
-    assert notifier.partition_for_slot(day_slots, *slot, per_day) == expected
+SLOT_SITE = {'id': 1, 'code': 'news', 'enabled': True, 'vapid_private_key': 'KEY'}
+SUBSCRIBERS = [{'id': i} for i in range(1, 8)]
+
+
+@pytest.fixture
+def sending(monkeypatch):
+    """send_slot with the database mocked: the recipients of deliver() and the final status of the message."""
+    calls = {}
+    monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: SLOT_SITE)
+    monkeypatch.setattr(notifier.db, 'get_slots', lambda site_id: [{'day': 1, 'hour': 7, 'minute': 30},
+                                                                   {'day': 1, 'hour': 21, 'minute': 0}])
+    monkeypatch.setattr(notifier.db, 'count_active_subscribers', lambda site_id: len(SUBSCRIBERS))
+    monkeypatch.setattr(notifier.db, 'claim_next_message', lambda site_id: {'id': 10, 'title': 'T', 'options': None})
+    monkeypatch.setattr(notifier.db, 'get_active_subscribers', lambda site_id: SUBSCRIBERS)
+    monkeypatch.setattr(notifier.db, 'finish_message', lambda message_id, status: calls.update(status=status))
+
+    def deliver(site, message, subscribers, kind, slot=None):
+        calls.update(subscribers=subscribers, kind=kind, slot=slot)
+        return {'total': len(subscribers), 'success': len(subscribers), 'gone': 0, 'errors': 0}
+    monkeypatch.setattr(notifier, 'deliver', deliver)
+    return calls
+
+
+def test_slot_sends_to_all_the_subscribers(sending):
+    notifier.send_slot(1, 1, 7, 30)
+    assert sending == {'subscribers': SUBSCRIBERS, 'kind': 'slot', 'slot': '07:30', 'status': 'sent'}
+
+
+def test_slot_no_longer_scheduled_sends_nothing(sending):
+    notifier.send_slot(1, 1, 8, 0)  # not a slot of Monday (any more)
+    notifier.send_slot(1, 2, 7, 30)  # 07:30 is not a slot of Tuesday
+    assert sending == {}
 
 
 def test_clean_message_keeps_known_options():

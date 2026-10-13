@@ -14,14 +14,13 @@ SET @code = 'mynews';
 SET @name = 'My News';
 SET @url = 'https://www.example.com';
 SET @vapid_sub = 'mailto:mail@example.com';
-SET @messages_per_day = 3;
 
 START TRANSACTION;
 
-INSERT INTO site (code, name, url, vapid_sub, messages_per_day) VALUES (@code, @name, @url, @vapid_sub, @messages_per_day);
+INSERT INTO site (code, name, url, vapid_sub) VALUES (@code, @name, @url, @vapid_sub);
 SET @site_id = LAST_INSERT_ID();
 
--- Subscribers: the same ids (same partitions); a duplicated endpoint keeps its most recent row (newest keys);
+-- Subscribers: the same ids; a duplicated endpoint keeps its most recent row (newest keys);
 -- expiration_time from timestamp to epoch milliseconds
 INSERT IGNORE INTO subscriber (id, site_id, endpoint, endpoint_hash, keys_p256dh, keys_auth, expiration_time)
 SELECT id, @site_id, endpoint, SHA2(endpoint, 256), keys_p256dh, keys_auth,
@@ -34,8 +33,12 @@ INSERT INTO message (id, site_id, title, options, status, sort_order, created_at
 SELECT id, @site_id, title, options, IF(pushed, 'sent', 'queued'), id, creation_time, 'migration'
 FROM messages;
 
+-- Schedule: the 5 default times every day (each slot sends to all the subscribers), not the old slots: they were
+-- made for a share of the subscribers each (change them in the console, page Schedules)
 INSERT IGNORE INTO schedule_slot (site_id, day, hour, minute)
-SELECT @site_id, day, hour, minute FROM schedules;
+SELECT @site_id, d.day, t.hour, t.minute
+FROM (SELECT 1 AS day UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7) d
+CROSS JOIN (SELECT 7 AS hour, 30 AS minute UNION SELECT 12, 30 UNION SELECT 15, 30 UNION SELECT 18, 30 UNION SELECT 21, 0) t;
 
 -- Sending log: no link to the message in the old table
 INSERT INTO delivery (site_id, message_id, kind, total, success, start_time, end_time)

@@ -254,7 +254,7 @@ def message_to_json(message):
         'send_after': iso(message['send_after']),
         'created_at': iso(message['created_at']),
         'sent_at': iso(message['sent_at']),
-        'deliveries': [{'kind': d['kind'], 'slot': d['slot'], 'partition': f"{d['partition_index'] + 1}/{d['partitions']}",
+        'deliveries': [{'kind': d['kind'], 'slot': d['slot'],
                         'total': d['total'], 'success': d['success'], 'gone': d['gone'], 'errors': d['errors'],
                         'start_time': iso(d['start_time']), 'end_time': iso(d['end_time'])}
                        for d in db.get_deliveries(message_id=message['id'], limit=100)],

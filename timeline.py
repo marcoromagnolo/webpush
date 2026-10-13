@@ -31,8 +31,7 @@ def today(sites, now=None):
         delivery = by_slot.get((slot['site_id'], at))
         if delivery:
             entry.update(status=entry_status(delivery), title=delivery['title'], message_id=delivery['message_id'],
-                         detail=f"{delivery['success']}/{delivery['total']} delivered, partition "
-                                f"{delivery['partition_index'] + 1}/{delivery['partitions']}")
+                         detail=f"{delivery['success']}/{delivery['total']} delivered")
         elif now.replace(hour=slot['hour'], minute=slot['minute'], second=0, microsecond=0) <= now:
             entry.update(status='missed', title=None, message_id=None,
                          detail='nothing sent: empty queue, no subscriber or site without keys')

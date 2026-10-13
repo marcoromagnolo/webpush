@@ -79,8 +79,8 @@ def update_user_password(user_id, password_hash):
 
 # Sites
 
-SITE_COLUMNS = ('code', 'name', 'url', 'allowed_origins', 'enabled', 'vapid_sub', 'messages_per_day', 'ttl_seconds',
-                'default_icon', 'default_badge')
+SITE_COLUMNS = ('code', 'name', 'url', 'allowed_origins', 'enabled', 'vapid_sub', 'ttl_seconds', 'default_icon',
+                'default_badge')
 
 
 def get_sites(enabled_only=False):
@@ -109,11 +109,6 @@ def update_site(site_id, values):
     with cursor(commit=True) as c:
         c.execute(f"UPDATE site SET {', '.join(k + ' = %s' for k in SITE_COLUMNS)} WHERE id = %s",
                   tuple(values[k] for k in SITE_COLUMNS) + (site_id,))
-
-
-def set_messages_per_day(site_id, messages_per_day):
-    with cursor(commit=True) as c:
-        c.execute("UPDATE site SET messages_per_day = %s WHERE id = %s", (messages_per_day, site_id))
 
 
 def set_site_keys(site_id, private_key, public_key):
@@ -160,12 +155,11 @@ def count_active_subscribers(site_id):
         return c.fetchone()['n']
 
 
-def get_subscribers_partition(site_id, partitions, partition_index):
-    """The active subscribers of a partition: MOD of the id, stable when subscribers are added or removed."""
+def get_active_subscribers(site_id):
+    """The active subscribers of a site, the recipients of a sending."""
     with cursor() as c:
         c.execute("SELECT id, endpoint, keys_p256dh, keys_auth, expiration_time FROM subscriber"
-                  f" WHERE site_id = %s AND {ACTIVE} AND MOD(id, %s) = %s ORDER BY id",
-                  (site_id, partitions, partition_index))
+                  f" WHERE site_id = %s AND {ACTIVE} ORDER BY id", (site_id,))
         return c.fetchall()
 
 
@@ -466,11 +460,10 @@ def replace_slots(site_id, slots):
 
 # Deliveries
 
-def start_delivery(site_id, message_id, kind, slot, partition_index, partitions, total):
+def start_delivery(site_id, message_id, kind, slot, total):
     with cursor(commit=True) as c:
-        c.execute("INSERT INTO delivery (site_id, message_id, kind, slot, partition_index, partitions, total, start_time)"
-                  " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                  (site_id, message_id, kind, slot, partition_index, partitions, total, datetime.now()))
+        c.execute("INSERT INTO delivery (site_id, message_id, kind, slot, total, start_time) VALUES (%s, %s, %s, %s, %s, %s)",
+                  (site_id, message_id, kind, slot, total, datetime.now()))
         return c.lastrowid
 
 

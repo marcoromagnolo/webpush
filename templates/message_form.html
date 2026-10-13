@@ -214,7 +214,7 @@
                                     {% for d in deliveries %}
                                         <tr>
                                             <td class="text-nowrap">{{ d.start_time.strftime('%d/%m %H:%M') }}</td>
-                                            <td>{% if d.kind == 'slot' %}slot {{ d.slot }}, partition {{ d.partition_index + 1 }}/{{ d.partitions }}{% elif d.kind == 'now' %}by hand, all{% else %}test{% endif %}
+                                            <td>{% if d.kind == 'slot' %}slot {{ d.slot }}{% elif d.kind == 'now' %}by hand{% else %}test{% endif %}
                                                 {% if not d.end_time %}<span class="badge bg-info text-dark">running</span>{% endif %}</td>
                                             <td class="text-end">{{ d.success }}/{{ d.total }}</td>
                                             <td class="text-end">{{ d.gone }}</td>

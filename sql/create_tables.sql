@@ -12,7 +12,6 @@ create table if not exists site(
 	vapid_private_key varchar(100) null default null,  -- base64url, raw 32 bytes
 	vapid_public_key varchar(120) null default null,  -- base64url, uncompressed point (applicationServerKey)
 	vapid_sub varchar(255) not null,  -- contact of the VAPID claims: mailto:... or https://...
-	messages_per_day int not null default 3,  -- messages a subscriber receives in a day (see Schedules)
 	ttl_seconds int not null default 86400,  -- the push service keeps a notification this long for an offline browser
 	default_icon varchar(1000) null default null,
 	default_badge varchar(1000) null default null,
@@ -77,15 +76,13 @@ create table if not exists schedule_slot(
 	constraint fk_slot_site foreign key (site_id) references site(id) on delete cascade
 );
 
--- A sending of a message to a share (partition) of the subscribers
+-- A sending of a message to the active subscribers of a site (slot, by hand) or to its test browsers
 create table if not exists delivery(
 	id int auto_increment,
 	site_id int not null,
 	message_id int null default null,
 	kind varchar(10) not null,  -- slot | now | test
 	slot char(5) null default null,  -- HH:MM of the slot
-	partition_index int not null default 0,
-	partitions int not null default 1,
 	total int not null default 0,
 	success int not null default 0,
 	gone int not null default 0,  -- subscribers removed: 404 / 410

@@ -1,14 +1,13 @@
 # Sending of the notifications to the subscribers of a site (Web Push with VAPID, pywebpush).
 #
-# At every schedule slot of a site (scheduler.py) the first message of its queue is sent to a share of the
-# subscribers (partition): with S slots in a day and M messages per day (setting of the site) the subscribers
-# are split in ceil(S / M) partitions, used in turn by the slots of the day, so every subscriber receives about
-# M messages a day. A partition is MOD(subscriber id, partitions): stable when subscribers are added or removed.
+# At every schedule slot of a site (scheduler.py) the first message of its queue is sent to all the active
+# subscribers: the slots are the few best times of the day (default 07:30 12:30 15:30 18:30 21:00), so a subscriber
+# receives at most one notification per slot. The queue is fed with few messages a day (e.g. the top news of the
+# site, 3-5 a day): with more messages than slots the others wait for the next slots.
 #
 # Outcome for each subscriber: 201 delivered; 404 / 410 the subscription doesn't exist any more (removed at once);
 # other errors are counted, the subscriber is removed after PUSH_MAX_FAILURES failures in a row.
 import json
-import math
 import threading
 import time
 from collections import Counter
@@ -89,14 +88,6 @@ def build_payload(site, message, track=True):
     payload['data'] = data
     return json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
 
-
-def partition_for_slot(day_slots, hour, minute, messages_per_day):
-    """(partition index, partitions) of a slot of the day: day_slots are the (hour, minute) of the day in order.
-    None if the slot is not among them."""
-    if (hour, minute) not in day_slots:
-        return None
-    partitions = max(1, math.ceil(len(day_slots) / max(1, messages_per_day)))
-    return day_slots.index((hour, minute)) % partitions, partitions
 
 
 _local = threading.local()
@@ -205,11 +196,11 @@ def debug_send(site, subscriber):
     return result
 
 
-def deliver(site, message, subscribers, kind, slot=None, partition_index=0, partitions=1):
+def deliver(site, message, subscribers, kind, slot=None):
     """Send a message to the subscribers, save the outcome (subscribers and delivery): the counts."""
     signer = vapid.signer(site['vapid_private_key'])
     payload = build_payload(site, message, track=kind != 'test')
-    delivery_id = db.start_delivery(site['id'], message['id'], kind, slot, partition_index, partitions, len(subscribers))
+    delivery_id = db.start_delivery(site['id'], message['id'], kind, slot, len(subscribers))
     outcomes = {'success': {}, 'gone': {}, 'expired': {}, 'error': {}}
     errors = Counter()
     if subscribers:
@@ -224,8 +215,7 @@ def deliver(site, message, subscribers, kind, slot=None, partition_index=0, part
     counts = {'total': len(subscribers), 'success': len(outcomes['success']),
               'gone': len(outcomes['gone']) + len(outcomes['expired']), 'errors': len(outcomes['error'])}
     db.finish_delivery(delivery_id, counts['success'], counts['gone'], counts['errors'])
-    logger.info(f"Message {message['id']} of {site['code']} ({kind}{' ' + slot if slot else ''},"
-                f" partition {partition_index + 1}/{partitions}): {counts}")
+    logger.info(f"Message {message['id']} of {site['code']} ({kind}{' ' + slot if slot else ''}): {counts}")
     if errors:
         summary = '; '.join(f"{error}: {n}" for error, n in errors.most_common(5))
         # all failed: an error of the page Errors, otherwise only in the log
@@ -245,14 +235,12 @@ def can_send(site):
 
 
 def send_slot(site_id, day, hour, minute):
-    """A schedule slot of a site: the next message of the queue to the partition of the slot."""
+    """A schedule slot of a site: the next message of the queue to all the active subscribers."""
     site = db.get_site(site_id)
     if not can_send(site):
         return
     slot = f"{hour:02}:{minute:02}"
-    day_slots = [(s['hour'], s['minute']) for s in db.get_slots(site_id) if s['day'] == day]
-    partition = partition_for_slot(day_slots, hour, minute, site['messages_per_day'])
-    if partition is None:
+    if not any((s['day'], s['hour'], s['minute']) == (day, hour, minute) for s in db.get_slots(site_id)):
         logger.info(f"Slot {slot} of {site['code']} no longer scheduled")
         return
     if db.count_active_subscribers(site_id) == 0:
@@ -264,9 +252,7 @@ def send_slot(site_id, day, hour, minute):
         return
     with errorlog.context(site_id, message['id']):
         try:
-            partition_index, partitions = partition
-            subscribers = db.get_subscribers_partition(site_id, partitions, partition_index)
-            counts = deliver(site, message, subscribers, 'slot', slot, partition_index, partitions)
+            counts = deliver(site, message, db.get_active_subscribers(site_id), 'slot', slot)
             db.finish_message(message['id'], 'failed' if counts['total'] and not counts['success'] else 'sent')
         except Exception as e:
             db.finish_message(message['id'], 'failed')
@@ -281,8 +267,7 @@ def send_now(message_id):
         return False
     with errorlog.context(site['id'], message_id):
         try:
-            subscribers = db.get_subscribers_partition(site['id'], 1, 0)
-            counts = deliver(site, message, subscribers, 'now')
+            counts = deliver(site, message, db.get_active_subscribers(site['id']), 'now')
             db.finish_message(message_id, 'failed' if counts['total'] and not counts['success'] else 'sent')
         except Exception as e:
             db.finish_message(message_id, 'failed')

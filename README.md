@@ -9,8 +9,8 @@ the messages are queued (console or REST API) and sent at the times of the sched
   IP blacklist, Errors. The menu chooses the site of the pages (or all the sites).
 * **REST API** `/api/v1/sites/<code>/...`: the browsers subscribe (public, only from the origins of the site), the CMS
   of the sites queue the messages (with a token).
-* **Scheduler**: at every slot of the schedule of a site the first message of its queue is sent to a share of the
-  subscribers (see *Sending*).
+* **Scheduler**: at every slot of the schedule of a site (default the 5 best times of the day) the first message of
+  its queue is sent to all the subscribers (see *Sending*).
 
 One process (Flask + waitress, Python 3.14) in a Docker container, also in local; the database is MariaDB on the host.
 Layout, stack and scripts are the ones of scrapynews.
@@ -55,7 +55,7 @@ the values:
 | `REFRESH_SECONDS` | `15` | automatic refresh of the pages **Home**, **Messages**, **Subscribers** and **Errors** (`0` = off); each page has its own choice, kept by the browser |
 | `LOG_LEVEL` | `INFO` | level of the log files in `log/` |
 
-The settings of each site (url, origins, VAPID keys, contact, messages per day, time to live, default icon and badge,
+The settings of each site (url, origins, VAPID keys, contact, time to live, default icon and badge,
 schedule) are in the database, managed in the console (pages **Sites** and **Schedules**).
 The schedules are in local time: the `TZ` of the container (`Europe/Rome`), of the computer in local.
 
@@ -169,11 +169,10 @@ From zero to a notification received by your browser. Port **8090**: 8080 is oft
    | Code | `demo` |
    | Url | `https://www.example.com` (any: the test page of the console doesn't need it) |
    | Contact | `mailto:<your address>` |
-   | Messages per subscriber a day | `3` |
-   | Generate new VAPID keys, Default schedule | checked |
+   | Generate new VAPID keys | checked |
 
-   The site is created with its VAPID keys and the slots every day, every hour 8:00-22:00, and becomes the site of
-   the menu (every page shows its data).
+   The site is created with its VAPID keys and the default schedule (every day 07:30 12:30 15:30 18:30 21:00, changed
+   in the page Schedules), and becomes the site of the menu (every page shows its data).
 
 8. **A real notification in the browser**: **Sites > Demo > Test page** (or the button *Test page* in the list of the
    sites). It is a page of the console with the code of **Integration** (`webpush-client.js`, `webpush-sw.js`, public
@@ -198,8 +197,8 @@ From zero to a notification received by your browser. Port **8090**: 8080 is oft
 9. **Test browser and scheduled sending**:
    * **Sites > Demo > Integration > Use this browser as test browser**: this browser receives the **Send test** of the
      messages (button in the page of a message), which doesn't change their status.
-   * **Schedules**: add to today a time 2 minutes from now (e.g. `8 9 10 ... 15:42`), **Save schedule**. At that
-     minute the first message of the queue is sent to its share of the subscribers: **Home > Today** shows it.
+   * **Schedules**: add to today a time 2 minutes from now (e.g. `07:30 12:30 15:42 18:30 21:00`), **Save schedule**.
+     At that minute the first message of the queue is sent to all the subscribers: **Home > Today** shows it.
 
 10. **API**: **API tokens**, client `curl`, site `Demo`, **Generate token** (shown only once), then the
     *Tests with curl* below.
@@ -562,13 +561,17 @@ cut by the stop ends as *failed*.
 Sending
 =======
 
-Every site has a weekly schedule (page **Schedules**) and a number of messages per subscriber a day `M`.
-On a day with `S` slots the subscribers are split in `ceil(S / M)` partitions (by subscriber id); the slots of the day
-use them in turn and each slot sends the **next message of the queue** to its partition. So every subscriber receives
-about `M` messages a day and the queue gives `S` messages a day.
+Every site has a weekly schedule (page **Schedules**, table `schedule_slot`): at every slot the **next message of the
+queue** is sent to **all** the active subscribers. A subscriber receives at most one notification per slot, so the
+schedule has a few slots at the best times of the day; the default, created with every site, is every day:
 
-Example: slots every hour 8:00-22:00 (15) and 3 messages a day: 5 partitions, the slot of 8:00 sends to the first fifth,
-9:00 to the second... 13:00 to the first again.
+| 07:30 | 12:30 | 15:30 | 18:30 | 21:00 |
+|---|---|---|---|---|
+| breakfast and commute | lunch break | afternoon | way home | after dinner |
+
+The queue is fed with few messages a day, e.g. the top news of the site (NewsPostX: the posts with the tag `topnews`
+of scrapynews, 3-5 a day): a news published at 23:00 leaves at 07:30, more messages than slots wait for the next slots.
+The schedule can't be empty (to stop the sendings disable the site); a day without times sends nothing.
 
 * Order of the queue: page **Messages** (arrows); a message with *Send after* waits for its time.
 * A slot with an empty queue, without subscribers or without keys sends nothing (yellow in **Home > Today**).
@@ -688,7 +691,7 @@ To debug the application outside of Docker (Flask server with the debugger, only
 |---|---|
 | `app.py` | console (pages, login), error handlers, start and stop |
 | `api.py` | REST API and old endpoints |
-| `notifier.py` | sendings: payload, partitions, outcome of the subscribers |
+| `notifier.py` | sendings: payload, the slots to all the subscribers, outcome of the subscribers |
 | `scheduler.py` | slots of the sites, cleanup of ip blacklist and errors |
 | `db.py`, `dbpool.py` | queries, connection pool |
 | `vapid.py` | VAPID keys (generation, import) |

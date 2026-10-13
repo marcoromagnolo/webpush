@@ -36,7 +36,7 @@ def test_parse_times():
 
 
 SITE_FORM = {'name': 'News', 'code': 'news', 'url': 'https://www.news.example/', 'vapid_sub': 'mailto:a@news.example',
-             'messages_per_day': '3', 'ttl_hours': '24', 'enabled': 'on', 'allowed_origins': 'https://m.news.example/\n\n'}
+             'ttl_hours': '24', 'enabled': 'on', 'allowed_origins': 'https://m.news.example/\n\n'}
 
 
 def test_site_form(monkeypatch):
@@ -47,7 +47,7 @@ def test_site_form(monkeypatch):
 
 
 @pytest.mark.parametrize('field, value', [('code', 'News Site'), ('url', 'ftp://x'), ('vapid_sub', 'a@news.example'),
-                                          ('messages_per_day', '0'), ('ttl_hours', '0'),
+                                          ('ttl_hours', '0'),
                                           ('allowed_origins', 'https://m.news.example/path')])
 def test_site_form_errors(monkeypatch, field, value):
     monkeypatch.setattr(webapp.db, 'get_site', lambda site_id=None, code=None: None)
@@ -59,3 +59,9 @@ def test_safe_next():
     assert webapp.safe_next('/messages?status=sent', '/') == '/messages?status=sent'
     for unsafe in ('//evil.example/x', 'https://evil.example/', None, ''):
         assert webapp.safe_next(unsafe, '/') == '/'
+
+
+def test_default_schedule():
+    # the 5 best times every day: 35 slots a week, created with every site
+    assert webapp.DEFAULT_TIMES == ((7, 30), (12, 30), (15, 30), (18, 30), (21, 0))
+    assert len(webapp.DEFAULT_SLOTS) == 35 and {d for d, _, _ in webapp.DEFAULT_SLOTS} == set(range(1, 8))

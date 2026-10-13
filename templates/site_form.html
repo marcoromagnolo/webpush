@@ -57,10 +57,6 @@
                         <div class="form-text">Sent to the push services (VAPID): <code>mailto:</code> address or https url.</div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <label class="form-label" for="messages_per_day">Messages per subscriber a day{{ info("How many notifications a subscriber receives in a day. With S slots in a day the subscribers are split in ceil(S / this) shares, one per slot in turn (see Schedules). From 1 to 24.") }}</label>
-                        <input class="form-control" type="number" min="1" max="24" id="messages_per_day" name="messages_per_day" required value="{{ form.messages_per_day }}">
-                    </div>
-                    <div class="col-6 col-md-3">
                         <label class="form-label" for="ttl_hours">Time to live (hours){{ info("How long a push service keeps a notification for a browser that is offline: after it, the notification is dropped. Short for news (e.g. 24), from 1 to 672 hours.") }}</label>
                         <input class="form-control" type="number" min="1" max="672" id="ttl_hours" name="ttl_hours" required value="{{ form.ttl_hours }}">
                         <div class="form-text">A browser offline longer doesn't receive it.</div>
@@ -83,10 +79,8 @@
                                 <input class="form-check-input" type="checkbox" id="generate_keys" name="generate_keys" {% if form.generate_keys %}checked{% endif %}>
                                 <label class="form-check-label" for="generate_keys">Generate new VAPID keys <span class="text-muted small">(uncheck to import existing ones)</span>{{ info("Creates the VAPID key pair of the site: the browsers subscribe with the public key, the sendings are signed with the private one. Uncheck to import existing keys afterwards (Keys > Import).") }}</label>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="default_schedule" name="default_schedule" {% if form.default_schedule %}checked{% endif %}>
-                                <label class="form-check-label" for="default_schedule">Default schedule: every day, every hour 8:00-22:00{{ info("Creates the slots every day, every hour from 8:00 to 22:00 (15 a day). They can be changed in the page Schedules.") }}</label>
-                            </div>
+                            <p class="small text-muted mb-0 mt-2">The schedule is created with the 5 default times every day
+                                ({{ DEFAULT_TIMES_TEXT }}): change them in the page Schedules.</p>
                         {% endif %}
                     </div>
                 </div>

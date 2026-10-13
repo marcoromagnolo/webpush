@@ -42,16 +42,16 @@
                         <h3 class="h5 mb-0">Schedule <span class="text-muted small">{{ site.name }}</span></h3>
                         <div class="d-flex flex-wrap gap-1">
                             <span class="small text-muted align-self-center me-1">Fill every day:</span>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="8-22-1">every hour 8-22</button>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="8-22-2">every 2 hours 8-22</button>
-                            <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="9-21-3">every 3 hours 9-21</button>
-                            <button class="btn btn-sm btn-outline-danger" type="button" data-preset="clear">clear</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="{{ DEFAULT_TIMES_TEXT }}"
+                                    title="The default: breakfast and commute, lunch break, afternoon, way home, after dinner">5 best times</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-preset="08:00 13:00 20:30"
+                                    title="Morning, lunch, evening">3 times</button>
                         </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle mb-0 schedules">
                             <thead>
-                            <tr><th scope="col">Day</th><th scope="col">Times <span class="text-muted small fw-normal">HH:MM separated by spaces or commas</span>{{ info("Times of the day when the next message of the queue is sent, local time of the server. HH:MM or only the hour (8 = 08:00), separated by spaces or commas, e.g. 8 12:30 18. Empty: no sending that day.") }}</th>
+                            <tr><th scope="col">Day</th><th scope="col">Times <span class="text-muted small fw-normal">HH:MM separated by spaces or commas</span>{{ info("Times of the day when the next message of the queue is sent to all the subscribers, local time of the server. HH:MM or only the hour (8 = 08:00), separated by spaces or commas, e.g. 7:30 12:30 21. Empty: no sending that day. The whole week can't be empty.") }}</th>
                                 <th scope="col" class="text-end">Slots</th><th scope="col"></th></tr>
                             </thead>
                             <tbody>
@@ -80,15 +80,13 @@
                 <div class="card">
                     <div class="card-header"><h3 class="h6 mb-0">Sending</h3></div>
                     <div class="card-body">
-                        <label class="form-label" for="messages_per_day">Messages per subscriber a day{{ info("How many notifications a subscriber receives in a day. With S slots in a day the subscribers are split in ceil(S / this) shares, one per slot in turn: every slot sends the next message of the queue to its share.") }}</label>
-                        <input class="form-control" type="number" min="1" max="24" id="messages_per_day" name="messages_per_day"
-                               value="{{ form.messages_per_day if form else site.messages_per_day }}" required>
-                        <div class="form-text mb-3">How many notifications a subscriber receives in a day: more is not better,
-                            too many make the visitors unsubscribe.</div>
                         <div class="small" id="schedule-explain"></div>
                         <hr>
-                        <p class="small mb-0">Every slot sends the next message of the queue to one share of the subscribers.
-                            Now in the queue: <a href="{{ url_for('messages', status='queued') }}"><b>{{ queued }}</b> messages</a>.
+                        <p class="small mb-0">Every slot sends the next message of the queue to <b>all</b> the subscribers: a
+                            subscriber receives at most one notification per slot. Few slots at the best times of the day: the
+                            queue is fed with few messages (e.g. the top news of the site, 3-5 a day), more messages than slots
+                            wait for the next slots. Now in the queue:
+                            <a href="{{ url_for('messages', status='queued') }}"><b>{{ queued }}</b> messages</a>.
                             Times are local time of the server.</p>
                     </div>
                     <div class="card-footer d-flex gap-2">
@@ -100,20 +98,13 @@
         </form>
 
         <script>
-            // Presets, copies between the days and the explanation of the partitions, recomputed while typing
+            // Presets, copies between the days and the explanation, recomputed while typing
             (function () {
                 var inputs = Array.prototype.slice.call(document.querySelectorAll('.day-times'));
-                var perDay = document.getElementById('messages_per_day');
                 function parse(text) {
                     return text.split(/[\s,;]+/).filter(Boolean).length;
                 }
-                function series(from, to, step) {
-                    var times = [];
-                    for (var h = from; h <= to; h += step) times.push((h < 10 ? '0' : '') + h + ':00');
-                    return times.join(' ');
-                }
                 function explain() {
-                    var m = Math.max(1, parseInt(perDay.value, 10) || 1);
                     var counts = inputs.map(function (input) { return parse(input.value); });
                     inputs.forEach(function (input, i) {
                         document.querySelector('.day-count[data-day="' + input.dataset.day + '"]').textContent = counts[i];
@@ -122,26 +113,18 @@
                     var max = Math.max.apply(null, counts);
                     var text;
                     if (!week) {
-                        text = '<span class="text-danger">No slot: nothing will be sent.</span>';
+                        text = '<span class="text-danger">No slot: the schedule can\'t be empty. To stop the sendings disable the site.</span>';
                     } else {
-                        var parts = Math.max(1, Math.ceil(max / m));
-                        text = 'On the busiest day: <b>' + max + '</b> slots, the subscribers are split in <b>' + parts +
-                            '</b> share' + (parts > 1 ? 's' : '') + ', each receives about <b>' + Math.min(m, max) +
-                            '</b> message' + (Math.min(m, max) > 1 ? 's' : '') + ' a day.<br>The queue gives <b>' + week +
-                            '</b> messages a week (one per slot): add them at the same pace.';
-                        if (max % m && max > m) text += '<br><span class="text-warning-emphasis">' + max + ' slots are not a multiple of ' + m +
-                            ': some subscribers receive one message less.</span>';
+                        text = 'At most <b>' + max + '</b> notification' + (max > 1 ? 's' : '') + ' a day for every subscriber, ' +
+                            '<b>' + week + '</b> a week: one per slot, when the queue has a message.';
+                        if (max > 6) text += '<br><span class="text-warning-emphasis">More than 6 a day: too many notifications ' +
+                            'make the visitors unsubscribe.</span>';
                     }
                     document.getElementById('schedule-explain').innerHTML = text;
                 }
                 document.querySelectorAll('[data-preset]').forEach(function (button) {
                     button.addEventListener('click', function () {
-                        var value = '';
-                        if (button.dataset.preset !== 'clear') {
-                            var p = button.dataset.preset.split('-').map(Number);
-                            value = series(p[0], p[1], p[2]);
-                        }
-                        inputs.forEach(function (input) { input.value = value; });
+                        inputs.forEach(function (input) { input.value = button.dataset.preset; });
                         explain();
                     });
                 });
@@ -160,7 +143,6 @@
                     });
                 });
                 inputs.forEach(function (input) { input.addEventListener('input', explain); });
-                perDay.addEventListener('input', explain);
                 explain();
             })();
         </script>
