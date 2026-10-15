@@ -105,6 +105,13 @@ def site_id_filter():
     return site['id'] if site else None
 
 
+def back_url():
+    """This page without its notices, where the buttons of the page go back. With the path prefix of the proxy
+    (script_root, e.g. /notify): request.path alone would go back to /subscribers instead of /notify/subscribers."""
+    args = {k: v for k, v in request.args.items() if k not in ('message', 'error', 'notice')}
+    return request.script_root + request.path + ('?' + urlencode(args) if args else '')
+
+
 @app.context_processor
 def common():
     def open_errors_count():
@@ -113,11 +120,6 @@ def common():
             return sum(db.count_open_errors(site_id_filter()).values())
         except Exception:
             return 0
-
-    def back_url():
-        # this page without its notices, where the buttons of the page go back
-        args = {k: v for k, v in request.args.items() if k not in ('message', 'error', 'notice')}
-        return request.path + ('?' + urlencode(args) if args else '')
 
     return {'current_year': datetime.now().year, 'open_errors_count': open_errors_count, 'back_url': back_url,
             'csrf_access_token': request.cookies.get(app.config['JWT_ACCESS_CSRF_COOKIE_NAME']),

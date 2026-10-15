@@ -61,6 +61,16 @@ def test_safe_next():
         assert webapp.safe_next(unsafe, '/') == '/'
 
 
+def test_back_url_keeps_the_proxy_prefix():
+    # behind nginx on /notify (X-Forwarded-Prefix -> script_root) the buttons must go back to /notify/...
+    with webapp.app.test_request_context('/subscribers?status=active&message=Removed',
+                                         base_url='https://www.example.com/notify/'):
+        assert webapp.back_url() == '/notify/subscribers?status=active'
+        assert webapp.safe_next(webapp.back_url(), '/') == '/notify/subscribers?status=active'
+    with webapp.app.test_request_context('/messages?error=x'):
+        assert webapp.back_url() == '/messages'
+
+
 def test_default_schedule():
     # the 5 best times every day: 35 slots a week, created with every site
     assert webapp.DEFAULT_TIMES == ((7, 30), (12, 30), (15, 30), (18, 30), (21, 0))
