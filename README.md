@@ -17,7 +17,7 @@ One process (Flask + waitress, Python 3.14) in a Docker container, also in local
 Layout, stack and scripts are the ones of scrapynews.
 
 Contents: *Requirements* · *Configuration* · *Install* (local and server) · *Tests with curl* · *Troubleshooting* ·
-*Upgrade from the single site version* · *Updates* · *Sending* · *REST API* · *Integration in a site* · *Operations* ·
+*Updates* · *Sending* · *REST API* · *Integration in a site* · *Operations* ·
 *VAPID keys* · *Development*
 
 Requirements
@@ -68,7 +68,7 @@ container `webpush` and waits until it answers; `docker-stop.sh` stops it. One i
 
 | | Your computer | Server |
 |---|---|---|
-| clone of the repository | e.g. `~/Projects/webpush` | `/srv/webpush/app` (user `webpush`) |
+| clone of the repository | e.g. `~/Projects/webpush` | `/srv/webpush` (user `webpush`) |
 | `.env` | configuration and secrets | same |
 | `log/`, `venv/` | mounted in the container | same |
 | database / MariaDB user of the app | `webpush` / `webpush_app@127.0.0.1` | same |
@@ -131,10 +131,6 @@ From zero to a notification received by your browser. Port **8090**: 8080 is oft
        # check: it prints webpush_app@127.0.0.1, the credentials of the application are right
        MYSQL_PWD="$(grep '^DB_PASSWORD=' .env | cut -d= -f2-)" \
            mariadb -h 127.0.0.1 -u webpush_app -N -e "SELECT CURRENT_USER();"
-
-   A database `webpush` of the single site version already there? `sudo mariadb webpush -e "SHOW TABLES"`: with
-   `messages` and `subscribers` see *Upgrade from the single site version* (or, to throw it away in local,
-   `sudo mariadb -e "DROP DATABASE webpush"` and run the block again).
 
 4. **Tables**, only at the first installation:
 
@@ -217,23 +213,22 @@ Server setup (once per server, as an administrator)
        sudo apt update
        sudo apt install -y docker.io mariadb-server mariadb-client gh git nginx
 
-2. User `webpush`, a system user (no password, not a sudoer) whose home is `/srv/webpush`, allowed to use Docker
-   (note: the group `docker` is equivalent to root on the host):
+2. User `webpush`, a system user (no password, not a sudoer) allowed to use Docker (note: the group `docker` is
+   equivalent to root on the host), and the directory of the installation `/srv/webpush`, its own. The home of the
+   user is `/var/lib/webpush`, not `/srv/webpush`: the GitHub login, the SSH keys and the backups stay out of the
+   clone of the repository (and of the context of the Docker image):
 
-       sudo adduser --system --group --home /srv/webpush --shell /bin/bash webpush
-       sudo chmod 750 /srv/webpush
+       sudo adduser --system --group --home /var/lib/webpush --shell /bin/bash webpush
+       sudo chmod 750 /var/lib/webpush
        sudo usermod -aG docker webpush
+       sudo install -d -o webpush -g webpush -m 750 /srv/webpush
 
    An administrator opens a shell as `webpush` with `sudo -iu webpush`; for a direct SSH access put a public key in
-   `/srv/webpush/.ssh/authorized_keys` (owned by `webpush`, mode 600, directory 700).
+   `/var/lib/webpush/.ssh/authorized_keys` (owned by `webpush`, mode 600, directory 700).
 
 3. MariaDB account `webpush`, authenticated by the Linux user (unix socket, no password): it creates the database
    `webpush` and the user of the application `webpush_app`, and can only use the database `webpush`.
-   `wait_timeout` of MariaDB (default 8 hours) must stay above `DB_POOL_RECYCLE`. The `ALTER USER` is needed on a
-   server of the single site version: its `sql/create_db.sql` created `'webpush'@'localhost'` **with a password**,
-   `CREATE USER IF NOT EXISTS` leaves it as it is and then `mariadb` as the user `webpush` answers
-   `ERROR 1045 (28000): Access denied for user 'webpush'@'localhost' (using password: NO)` (the old application
-   stops working with that password: it is replaced, *Upgrade from the single site version*):
+   `wait_timeout` of MariaDB (default 8 hours) must stay above `DB_POOL_RECYCLE`:
 
        sudo mariadb <<'SQL'
        CREATE USER IF NOT EXISTS 'webpush'@'localhost' IDENTIFIED VIA unix_socket;
@@ -244,7 +239,7 @@ Server setup (once per server, as an administrator)
        # check: it prints webpush@localhost
        sudo -iu webpush mariadb -N -e "SELECT CURRENT_USER();"
 
-4. GitHub login of the user `webpush` (the token is saved in `/srv/webpush/.config/gh`):
+4. GitHub login of the user `webpush` (the token is saved in `/var/lib/webpush/.config/gh`):
 
        sudo -iu webpush gh auth login
 
@@ -252,8 +247,8 @@ Server installation (as the user `webpush`)
 -------------------------------------------
 
 Steps 1-5 run in a shell of the user `webpush`, without sudo. `/srv/webpush` belongs to `webpush` with mode 750
-(*Server setup*, step 2): your administrator user can't enter it (`cd /srv/webpush/app`: *Permission denied*) and
-must not create anything there with `sudo` (the files would belong to root). From your administrator user open the
+(*Server setup*, step 2): your administrator user can't enter it (`cd /srv/webpush`: *Permission denied*) and must
+not create anything there with `sudo` (the files would belong to root). From your administrator user open the
 shell of `webpush` first:
 
     sudo -iu webpush        # the prompt becomes webpush@...; exit goes back to your user
@@ -261,9 +256,9 @@ shell of `webpush` first:
 Every block of commands is complete: a new shell doesn't keep the variables of the previous steps. Step 6 (nginx)
 needs an administrator: `exit` first.
 
-1. Code:
+1. Code, in the empty directory `/srv/webpush`:
 
-       gh repo clone marcoromagnolo/webpush /srv/webpush/app
+       gh repo clone marcoromagnolo/webpush /srv/webpush
 
 2. Database, MariaDB user and `.env`. The account `webpush` connects without password (*Server setup*, step 3). The
    password of the MariaDB user of the application is generated and written only in `.env` (never shown). The user is
@@ -274,7 +269,7 @@ needs an administrator: `exit` first.
    password and only `DB_PASSWORD` of the existing `.env` changes (then recreate the container, step 4: `--env-file`
    is read only by `docker run`):
 
-       cd /srv/webpush/app
+       cd /srv/webpush
        DB_PASS=$(openssl rand -base64 24 | tr -d '/+=')
        mariadb <<SQL
        CREATE DATABASE IF NOT EXISTS webpush DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;
@@ -302,23 +297,20 @@ needs an administrator: `exit` first.
        MYSQL_PWD="$(grep '^DB_PASSWORD=' .env | cut -d= -f2-)" \
            mariadb -h 127.0.0.1 -u webpush_app -N -e "SELECT CURRENT_USER();"
 
-   `ERROR 1045 ... 'webpush'@'localhost' (using password: NO)` at the first `mariadb`: the account `webpush` still has
-   the password of the single site version, `ALTER USER` of *Server setup*, step 3.
+   `ERROR 1045 ... 'webpush'@'localhost' (using password: NO)` at the first `mariadb`: the account `webpush` of
+   *Server setup*, step 3, is missing or has a password (its `ALTER USER`).
 
-   Then set `PUBLIC_URL` (the https address of the application, e.g. `https://www.example.com/notify`) and, for a
-   site of the single site version, `DEFAULT_SITE`:
+   Then set `PUBLIC_URL` (the https address of the application, e.g. `https://www.example.com/notify`):
 
-       nano /srv/webpush/app/.env
+       nano /srv/webpush/.env
 
 3. Tables, only at the first installation:
 
-       mariadb webpush < /srv/webpush/app/sql/create_tables.sql
-
-   A database of the single site version: *Upgrade from the single site version* instead.
+       mariadb webpush < /srv/webpush/sql/create_tables.sql
 
 4. Start:
 
-       /srv/webpush/app/docker-start.sh
+       /srv/webpush/docker-start.sh
 
    It ends with `webpush started: web app on 127.0.0.1:8080`. The container restarts with the server
    (`--restart unless-stopped`, 1 CPU, 512 MB of memory).
@@ -479,69 +471,13 @@ the failed sendings.
 | nothing sent at the time of a slot | empty queue, no subscribers, no keys or site disabled | **Home > Today** (yellow: nothing sent), `log/notifier.log` |
 | `IP blocked` / `Forbidden :(` | too many failed logins or wrong tokens | page **IP blacklist** (or the SQL in *Operations*) |
 
-Upgrade from the single site version
-====================================
-
-The database of the single site version (tables `messages`, `subscribers`, `schedules`, `log_messages`) is moved to the
-multi site tables with its site, by `sql/upgrade_2026-10-12_multisite.sql`: the subscribers and the queue are kept.
-It replaces step 3 (*Tables*) of *Server installation*; the other steps are the same. On the server, in the shell of
-the user `webpush` (`sudo -iu webpush`; the account `webpush` of MariaDB connects without password, *Server setup*,
-step 3), after steps 1 and 2 of *Server installation*:
-
-1. Stop the old application (`./stop.sh` in the directory of the old version) and back up the database in
-   `/srv/webpush`:
-
-       mariadb-dump webpush > /srv/webpush/webpush-backup-$(date +%F).sql
-       ls -lh /srv/webpush/webpush-backup-*.sql
-
-2. Site of the old data: edit the values at the top of the script (code, name, url, contact), and in `.env`
-   `DEFAULT_SITE=<the same code>` (the old endpoints `/subscription/` and `/push_message/` keep working):
-
-       nano /srv/webpush/app/sql/upgrade_2026-10-12_multisite.sql
-       nano /srv/webpush/app/.env
-
-3. New tables and move of the data:
-
-       cd /srv/webpush/app
-       mariadb webpush < sql/create_tables.sql
-       mariadb webpush < sql/upgrade_2026-10-12_multisite.sql
-
-   The last query shows the counts of the old and the new tables. Duplicated subscriptions are merged (the most
-   recent keys), the queue keeps its order, the old tables are renamed `*_old` (drop them when everything works).
-
-4. Start (step 4 of *Server installation*):
-
-       /srv/webpush/app/docker-start.sh
-
-5. Import the VAPID keys of the old installation, so that the browsers already subscribed keep working: console
-   **Sites > the site > Keys > Import** with the content of `private_key.txt` and `public_key.txt` of the old
-   version, or in the container (`/srv/webpush/app/log` is mounted in `/app/log`; `<old>` is the directory of the
-   old version):
-
-       cp <old>/private_key.txt <old>/public_key.txt /srv/webpush/app/log/
-       docker exec webpush python vapid.py import <code> log/private_key.txt log/public_key.txt
-       rm /srv/webpush/app/log/private_key.txt /srv/webpush/app/log/public_key.txt
-
-6. `POST /push_message/` now needs an API token (`Authorization: Bearer ...`, page **API tokens**): update the CMS.
-   `GET/POST /subscription/` work as before.
-7. Move the site to the new client when possible (*Integration in a site*): `webpush-sw.js` replaces the old service
-   worker (same scope, the subscriptions are kept) and adds click tracking and the renewal of the subscriptions.
-
-Back: stop the container (`/srv/webpush/app/docker-stop.sh`), restore the backup on an empty database and start the
-old version of the code:
-
-    mariadb -e "DROP DATABASE webpush; CREATE DATABASE webpush DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;"
-    mariadb webpush < /srv/webpush/webpush-backup-YYYY-MM-DD.sql
-
-In local the same steps run in `~/Projects/webpush`, with `sudo mariadb` instead of `mariadb`.
-
 Updates
 =======
 
 Update an installation to the last version of the repository, as its owner (on the server, `sudo -iu webpush`
 first):
 
-    cd /srv/webpush/app                                # in local: cd ~/Projects/webpush
+    cd /srv/webpush                                    # in local: cd ~/Projects/webpush
     old=$(git rev-parse HEAD)
     git pull --ff-only                                 # or gh repo sync
     git diff --name-only "$old" HEAD -- sql/upgrade_   # database upgrades to run, if any
@@ -551,7 +487,7 @@ first):
   slot of the schedule), then run the new ones once, in date order, after a backup:
 
       ./docker-stop.sh
-      mariadb-dump webpush > /srv/webpush/webpush-backup-$(date +%F).sql
+      mariadb-dump webpush > ~/webpush-backup-$(date +%F).sql
       mariadb webpush < sql/upgrade_YYYY-MM-DD_<name>.sql
 
 * Application: rebuild the image and recreate the container (the dependencies are reinstalled when
@@ -647,7 +583,7 @@ the footer, invitation banner, service worker served by WordPress): theme `npx_v
 Operations
 ==========
 
-On the server in the shell of the user `webpush` (`sudo -iu webpush`, then `cd /srv/webpush/app`; in local in
+On the server in the shell of the user `webpush` (`sudo -iu webpush`, then `cd /srv/webpush`; in local in
 `~/Projects/webpush`):
 
     docker logs -f webpush                  # container output (dependency install at the first start)
@@ -663,7 +599,7 @@ On the server in the shell of the user `webpush` (`sudo -iu webpush`, then `cd /
 * Locked out by the ip blacklist (3 failed logins: 60 minutes):
   `mariadb webpush -e "DELETE FROM ip_blacklist WHERE remote_address = '<ip>'"`
 * Forgotten password: `mariadb webpush -e "DELETE FROM user"`, the next access opens **Setup** again.
-* Backup: `mariadb-dump webpush > /srv/webpush/webpush-$(date +%F).sql`
+* Backup: `mariadb-dump webpush > ~/webpush-$(date +%F).sql`
 
 (as the user `webpush` on the server; in local `sudo mariadb`, `sudo mariadb-dump`)
 

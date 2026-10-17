@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stop the container of webpush (README.md > Operations), as the owner of the installation:
 #
-#     /srv/webpush/app/docker-stop.sh
+#     /srv/webpush/docker-stop.sh
 #
 # A stopped container stays stopped also after a reboot of the server (--restart unless-stopped), until
 # docker-start.sh. The app waits for the sendings running within the stop timeout of the container

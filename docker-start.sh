@@ -2,7 +2,7 @@
 # Build the image and (re)create the container of webpush (README.md > Install), as the owner of the installation
 # (on a server the user webpush, on your computer yourself):
 #
-#     /srv/webpush/app/docker-start.sh
+#     /srv/webpush/docker-start.sh
 #
 # One installation serves all the sites. A running container is replaced: the sendings running are stopped
 # (their messages end as failed).

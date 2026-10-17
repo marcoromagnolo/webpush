@@ -1,5 +1,4 @@
--- Tables of webpush (new installation, README.md > Install). A database of the single site version: see
--- sql/upgrade_2026-10-12_multisite.sql (README.md > Upgrade from the single site version).
+-- Tables of webpush (README.md > Install).
 
 -- Websites that send notifications: one installation serves all of them
 create table if not exists site(
