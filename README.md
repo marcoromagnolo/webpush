@@ -477,23 +477,12 @@ Updates
 Update an installation to the last version of the repository, as its owner (on the server, `sudo -iu webpush`
 first):
 
-    cd /srv/webpush                                    # in local: cd ~/Projects/webpush
-    old=$(git rev-parse HEAD)
-    git pull --ff-only                                 # or gh repo sync
-    git diff --name-only "$old" HEAD -- sql/upgrade_   # database upgrades to run, if any
+    cd /srv/webpush                # in local: cd ~/Projects/webpush
+    git pull --ff-only             # or gh repo sync
+    ./docker-start.sh
 
-* Database: every change of the schema comes with a script `sql/upgrade_YYYY-MM-DD_<name>.sql` (the same change is
-  also made in `sql/create_tables.sql`). Stop the container first (the old code would run on the new schema, e.g. a
-  slot of the schedule), then run the new ones once, in date order, after a backup:
-
-      ./docker-stop.sh
-      mariadb-dump webpush > ~/webpush-backup-$(date +%F).sql
-      mariadb webpush < sql/upgrade_YYYY-MM-DD_<name>.sql
-
-* Application: rebuild the image and recreate the container (the dependencies are reinstalled when
-  `requirements.txt` changed). A change of `.env` too needs it: Docker reads it only when the container is created.
-
-      ./docker-start.sh
+`docker-start.sh` rebuilds the image and recreates the container (the dependencies are reinstalled when
+`requirements.txt` changed). A change of `.env` too needs it: Docker reads it only when the container is created.
 
 At the stop of the container the sendings running are completed (within 60 seconds), the scheduler stops; a sending
 cut by the stop ends as *failed*.
@@ -642,5 +631,5 @@ To debug the application outside of Docker (Flask server with the debugger, only
 | `templates/`, `static/main.css` | console (Bootstrap 5, as scrapynews) |
 | `static/webpush-client.js`, `static/webpush-sw.js` | code for the sites (also used by the test page of the console) |
 | `Dockerfile`, `install_deps.sh`, `docker-start.sh`, `docker-stop.sh` | container |
-| `sql/` | tables (`create_tables.sql`), upgrades of the database (`upgrade_YYYY-MM-DD_<name>.sql`) |
+| `sql/` | tables (`create_tables.sql`) |
 | `tests/` | pytest |
