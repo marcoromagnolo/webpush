@@ -167,7 +167,7 @@ HINTS = {
 def debug_send(site, subscriber):
     """Send a test notification to one subscriber and describe everything (test page of the console):
     request, answer of the push service, hint. The subscriber is not changed."""
-    payload = json.dumps({'title': f"WebPush test - {site['name']}",
+    payload = json.dumps({'title': f"Web Push test - {site['name']}",
                           'body': f"Sent at {datetime.now().strftime('%H:%M:%S')}: push service, browser and "
                                   f"service worker work.",
                           'icon': site['default_icon'] or None, 'tag': 'webpush-test', 'renotify': True,
