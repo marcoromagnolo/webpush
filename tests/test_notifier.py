@@ -78,6 +78,15 @@ def test_build_payload_defaults_and_tracking():
     assert payload['data']['url'] == 'https://example.com/a'
     assert payload['data']['webpush'] == {'message_id': 7, 'click_url': 'https://push.example.com/api/v1/sites/news/clicks'}
     assert 'webpush' not in json.loads(notifier.build_payload(SITE, message, track=False))['data']
+    assert 'lang' not in payload  # no language of the site
+
+
+def test_build_payload_lang_of_the_site():
+    site = dict(SITE, default_lang='it-IT')
+    message = {'id': 7, 'title': 'T', 'options': json.dumps({'body': 'B'})}
+    assert json.loads(notifier.build_payload(site, message))['lang'] == 'it-IT'
+    message['options'] = json.dumps({'body': 'B', 'lang': 'en'})  # the lang of the message wins
+    assert json.loads(notifier.build_payload(site, message))['lang'] == 'en'
 
 
 class Response:

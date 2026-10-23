@@ -69,6 +69,10 @@
                         <label class="form-label" for="default_badge">Default badge{{ info("Small monochrome image (PNG with transparency, 96x96) shown by Android in the status bar when the message has no badge.") }}</label>
                         <input class="form-control" type="url" id="default_badge" name="default_badge" value="{{ form.default_badge or '' }}" placeholder="https://.../badge.png">
                     </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="default_lang">Language{{ info("Language of the texts of the notifications when the message has none (option lang), e.g. it-IT. It does not change the words added by the browser (e.g. from / via), which are in the language of the browser.") }}</label>
+                        <input class="form-control" type="text" id="default_lang" name="default_lang" maxlength="35" value="{{ form.default_lang or '' }}" placeholder="it-IT">
+                    </div>
                     <div class="col-12 d-flex flex-wrap gap-4">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {% if form.enabled %}checked{% endif %}>

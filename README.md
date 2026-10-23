@@ -56,7 +56,7 @@ the values:
 | `REFRESH_SECONDS` | `15` | automatic refresh of the pages **Home**, **Messages**, **Subscribers** and **Errors** (`0` = off); each page has its own choice, kept by the browser |
 | `LOG_LEVEL` | `INFO` | level of the log files in `log/` |
 
-The settings of each site (url, origins, VAPID keys, contact, time to live, default icon and badge,
+The settings of each site (url, origins, VAPID keys, contact, time to live, default icon, badge and language,
 schedule) are in the database, managed in the console (pages **Sites** and **Schedules**).
 The schedules are in local time: the `TZ` of the container (`Europe/Rome`), of the computer in local.
 
@@ -537,7 +537,7 @@ Body of `POST /sites/<code>/messages`:
 |---|---|---|
 | `title` | required | max 255 characters |
 | `url` | optional | page opened by a click (shortcut of `options.data.url`) |
-| `options` | optional | [options of a notification](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification#options): body, icon, image, badge, dir, lang, tag, timestamp, requireInteraction, renotify, silent, vibrate, actions (max 2, `{"action", "title"}`), data |
+| `options` | optional | [options of a notification](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification#options): body, icon, image, badge, dir, lang (default: Language of the site), tag, timestamp, requireInteraction, renotify, silent, vibrate, actions (max 2, `{"action", "title"}`), data |
 | `send_after` | optional | ISO 8601 date and time: not sent before |
 
 Title and options together: at most 3500 bytes. The links of the buttons: `options.data.actions = {"<action>": "<url>"}`.

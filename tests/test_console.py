@@ -44,10 +44,12 @@ def test_site_form(monkeypatch):
     values = webapp.form_to_site(MultiDict(SITE_FORM))
     assert values['url'] == 'https://www.news.example' and values['allowed_origins'] == 'https://m.news.example'
     assert values['ttl_seconds'] == 86400 and values['enabled'] is True
+    assert values['default_lang'] is None
+    assert webapp.form_to_site(MultiDict(dict(SITE_FORM, default_lang=' it-IT ')))['default_lang'] == 'it-IT'
 
 
 @pytest.mark.parametrize('field, value', [('code', 'News Site'), ('url', 'ftp://x'), ('vapid_sub', 'a@news.example'),
-                                          ('ttl_hours', '0'),
+                                          ('ttl_hours', '0'), ('default_lang', 'italiano'),
                                           ('allowed_origins', 'https://m.news.example/path')])
 def test_site_form_errors(monkeypatch, field, value):
     monkeypatch.setattr(webapp.db, 'get_site', lambda site_id=None, code=None: None)

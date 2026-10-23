@@ -80,7 +80,7 @@ def update_user_password(user_id, password_hash):
 # Sites
 
 SITE_COLUMNS = ('code', 'name', 'url', 'allowed_origins', 'enabled', 'vapid_sub', 'ttl_seconds', 'default_icon',
-                'default_badge')
+                'default_badge', 'default_lang')
 
 
 def get_sites(enabled_only=False):

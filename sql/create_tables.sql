@@ -14,6 +14,7 @@ create table if not exists site(
 	ttl_seconds int not null default 86400,  -- the push service keeps a notification this long for an offline browser
 	default_icon varchar(1000) null default null,
 	default_badge varchar(1000) null default null,
+	default_lang varchar(35) null default null,  -- lang of the notifications without one (BCP 47, e.g. it-IT)
 	created_at timestamp not null default current_timestamp,
 	primary key(id),
 	unique key unique_site_code (code)

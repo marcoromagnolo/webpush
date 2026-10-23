@@ -705,6 +705,7 @@ def form_to_site(form, site=None):
         'ttl_seconds': (form.get('ttl_hours', type=int) or 0) * 3600,
         'default_icon': form.get('default_icon', '').strip() or None,
         'default_badge': form.get('default_badge', '').strip() or None,
+        'default_lang': form.get('default_lang', '').strip() or None,
     }
     if not re.match(SITE_CODE_PATTERN, values['code']):
         raise ValueError("Code: 2-50 characters, lowercase letters, numbers and dash (it is in the API urls)")
@@ -717,6 +718,8 @@ def form_to_site(form, site=None):
             raise ValueError(f"{label}: an http(s) url")
     if not values['url']:
         raise ValueError("The url of the site is required")
+    if values['default_lang'] and not re.match(r"^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$", values['default_lang']):
+        raise ValueError("Language: a code like it or it-IT")
     for origin in (values['allowed_origins'] or '').splitlines():
         parsed = urlparse(origin)
         if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.path:
@@ -761,7 +764,8 @@ def site_new():
 
 def site_page(site, form=None, error=None, key_error=None):
     form = form or dict(site, ttl_hours=site['ttl_seconds'] // 3600, allowed_origins=site['allowed_origins'] or '',
-                        default_icon=site['default_icon'] or '', default_badge=site['default_badge'] or '')
+                        default_icon=site['default_icon'] or '', default_badge=site['default_badge'] or '',
+                        default_lang=site['default_lang'] or '')
     return render_template("site_form.html", title="Sites", site=site, form=form, error=error, key_error=key_error,
                            public_url=settings.PUBLIC_URL, origins=sorted(api.site_origins(site)),
                            test_subscribers=db.get_test_subscribers(site['id']),

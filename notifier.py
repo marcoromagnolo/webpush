@@ -80,6 +80,8 @@ def build_payload(site, message, track=True):
         payload.setdefault('icon', site['default_icon'])
     if site['default_badge']:
         payload.setdefault('badge', site['default_badge'])
+    if site.get('default_lang'):
+        payload.setdefault('lang', site['default_lang'])
     data = dict(payload.get('data') or {})
     if track:
         # the service worker (static/webpush-sw.js) sends the click to click_url
