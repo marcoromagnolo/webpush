@@ -15,6 +15,7 @@ create table if not exists site(
 	default_icon varchar(1000) null default null,
 	default_badge varchar(1000) null default null,
 	default_lang varchar(35) null default null,  -- lang of the notifications without one (BCP 47, e.g. it-IT)
+	use_schedule boolean not null default true,  -- true: the slots of the schedule send the queue; false: every message at its send_after (none: at once)
 	created_at timestamp not null default current_timestamp,
 	primary key(id),
 	unique key unique_site_code (code)
@@ -81,7 +82,7 @@ create table if not exists delivery(
 	id int auto_increment,
 	site_id int not null,
 	message_id int null default null,
-	kind varchar(10) not null,  -- slot | now | test
+	kind varchar(10) not null,  -- slot | time (at the send_after of the message) | now | test
 	slot char(5) null default null,  -- HH:MM of the slot
 	total int not null default 0,
 	success int not null default 0,

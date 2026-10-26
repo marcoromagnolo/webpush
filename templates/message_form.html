@@ -37,7 +37,7 @@
                                 {% if not message %}<input type="hidden" name="site_id" value="{{ site.id }}">{% endif %}
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="send_after">Send after <span class="text-muted small">(optional)</span>{{ info("Optional: the message is not sent before this date and time (local time of the server). Until then the next messages of the queue go ahead.") }}</label>
+                                <label class="form-label" for="send_after">Send after <span class="text-muted small">(optional)</span>{{ info("Optional, local time of the server. With the schedule: the message is not sent before this time, until then the next messages of the queue go ahead. Site that sends at the time of the messages (Sites > Sending): the message is sent at this time, empty: at once.") }}</label>
                                 <input class="form-control" type="datetime-local" id="send_after" name="send_after" value="{{ form.send_after or '' }}">
                                 <div class="form-text">Not sent before this time: the next messages of the queue go ahead.</div>
                             </div>
@@ -204,7 +204,7 @@
                                     {% for d in deliveries %}
                                         <tr>
                                             <td class="text-nowrap">{{ d.start_time.strftime('%d/%m %H:%M') }}</td>
-                                            <td>{% if d.kind == 'slot' %}slot {{ d.slot }}{% elif d.kind == 'now' %}by hand{% else %}test{% endif %}
+                                            <td>{% if d.kind == 'slot' %}slot {{ d.slot }}{% elif d.kind == 'time' %}at its time{% elif d.kind == 'now' %}by hand{% else %}test{% endif %}
                                                 {% if not d.end_time %}<span class="badge bg-info text-dark">running</span>{% endif %}</td>
                                             <td class="text-end">{{ d.success }}/{{ d.total }}</td>
                                             <td class="text-end">{{ d.gone }}</td>

@@ -45,6 +45,8 @@ def test_site_form(monkeypatch):
     assert values['url'] == 'https://www.news.example' and values['allowed_origins'] == 'https://m.news.example'
     assert values['ttl_seconds'] == 86400 and values['enabled'] is True
     assert values['default_lang'] is None
+    assert values['use_schedule'] is True  # default: the schedule
+    assert webapp.form_to_site(MultiDict(dict(SITE_FORM, sending='time')))['use_schedule'] is False
     assert webapp.form_to_site(MultiDict(dict(SITE_FORM, default_lang=' it-IT ')))['default_lang'] == 'it-IT'
 
 

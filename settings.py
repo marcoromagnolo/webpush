@@ -32,7 +32,8 @@ WEB_SETTINGS = {
     'failed_login_block_duration': 60,
 }
 
-# Public url of this application as the browsers of the sites reach it (e.g. https://www.example.com/notify):
+# Public url of this application as the browsers of the sites reach it (e.g. https://webpush.example.com, or a
+# path of a site, https://www.example.com/notify):
 # base of the API in the integration snippet and of the click tracking sent with the notifications
 PUBLIC_URL = os.getenv('PUBLIC_URL', f"http://{WEB_SETTINGS['host']}:{WEB_SETTINGS['port']}").rstrip('/')
 

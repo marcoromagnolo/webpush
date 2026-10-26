@@ -706,6 +706,8 @@ def form_to_site(form, site=None):
         'default_icon': form.get('default_icon', '').strip() or None,
         'default_badge': form.get('default_badge', '').strip() or None,
         'default_lang': form.get('default_lang', '').strip() or None,
+        # sending: 'schedule' (slots of the page Schedules) or 'time' (every message at its send_after)
+        'use_schedule': form.get('sending', 'schedule') != 'time',
     }
     if not re.match(SITE_CODE_PATTERN, values['code']):
         raise ValueError("Code: 2-50 characters, lowercase letters, numbers and dash (it is in the API urls)")
@@ -740,7 +742,7 @@ def sites():
 @app.route("/sites/new", methods=["GET", "POST"])
 @jwt_required()
 def site_new():
-    form = {'enabled': True, 'ttl_hours': 24, 'generate_keys': True}
+    form = {'enabled': True, 'ttl_hours': 24, 'generate_keys': True, 'sending': 'schedule'}
     error = None
     if request.method == 'POST':
         form = request.form.to_dict()
@@ -765,7 +767,7 @@ def site_new():
 def site_page(site, form=None, error=None, key_error=None):
     form = form or dict(site, ttl_hours=site['ttl_seconds'] // 3600, allowed_origins=site['allowed_origins'] or '',
                         default_icon=site['default_icon'] or '', default_badge=site['default_badge'] or '',
-                        default_lang=site['default_lang'] or '')
+                        default_lang=site['default_lang'] or '', sending='schedule' if site['use_schedule'] else 'time')
     return render_template("site_form.html", title="Sites", site=site, form=form, error=error, key_error=key_error,
                            public_url=settings.PUBLIC_URL, origins=sorted(api.site_origins(site)),
                            test_subscribers=db.get_test_subscribers(site['id']),

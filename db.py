@@ -80,7 +80,7 @@ def update_user_password(user_id, password_hash):
 # Sites
 
 SITE_COLUMNS = ('code', 'name', 'url', 'allowed_origins', 'enabled', 'vapid_sub', 'ttl_seconds', 'default_icon',
-                'default_badge', 'default_lang')
+                'default_badge', 'default_lang', 'use_schedule')
 
 
 def get_sites(enabled_only=False):
@@ -371,6 +371,15 @@ def get_next_queued(site_id, limit):
         return c.fetchall()
 
 
+def get_sites_with_due_messages():
+    """Ids of the enabled sites without schedule with queued messages whose time has come (send_after past or none)."""
+    with cursor() as c:
+        c.execute("SELECT DISTINCT m.site_id FROM message m JOIN site s ON s.id = m.site_id"
+                  " WHERE s.enabled = true AND s.use_schedule = false AND m.status = 'queued'"
+                  " AND (m.send_after IS NULL OR m.send_after <= %s)", (datetime.now(),))
+        return [row['site_id'] for row in c.fetchall()]
+
+
 def claim_next_message(site_id):
     """The first message of the queue that can be sent now, marked as sending; None if there is none."""
     now = datetime.now()
@@ -547,7 +556,7 @@ def get_sites_summary():
                   " (SELECT COUNT(*) FROM message m WHERE m.site_id = t.id AND m.status = 'queued') AS queued,"
                   " (SELECT COUNT(DISTINCT d.message_id) FROM delivery d WHERE d.site_id = t.id AND d.kind != 'test'"
                   "  AND d.start_time >= %s) AS sent_today,"
-                  " (SELECT COUNT(*) FROM schedule_slot l WHERE l.site_id = t.id) AS slots"
+                  " (SELECT COUNT(*) FROM schedule_slot l WHERE l.site_id = t.id) AS slots, t.use_schedule"
                   " FROM site t ORDER BY t.name", (today,))
         return c.fetchall()
 

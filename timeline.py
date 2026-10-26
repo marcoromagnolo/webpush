@@ -1,7 +1,8 @@
 # Hourly view of today in the Home: the slots of the day of the sites with what happened (deliveries) or what is
-# going to be sent (the next messages of the queues), and the sendings started by hand.
+# going to be sent (the next messages of the queues), and the sendings started by hand. The sites without schedule
+# (use_schedule false): their messages sent today at their time and the ones still to send today.
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import db
 
@@ -18,7 +19,9 @@ def today(sites, now=None):
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     names = {site['id']: site['name'] for site in sites}
     many = len(sites) > 1
-    slots = [s for s in db.get_slots() if s['site_id'] in names and s['day'] == now.isoweekday()]
+    timed = {site['id'] for site in sites if not site.get('use_schedule', True)}
+    slots = [s for s in db.get_slots() if s['site_id'] in names and s['site_id'] not in timed
+             and s['day'] == now.isoweekday()]
     deliveries = [d for d in db.get_deliveries(since=midnight, limit=2000) if d['site_id'] in names and d['kind'] != 'test']
     by_slot = {(d['site_id'], d['slot']): d for d in deliveries if d['kind'] == 'slot'}
     queues = {site_id: db.get_next_queued(site_id, 100) for site_id in {s['site_id'] for s in slots}}
@@ -45,7 +48,20 @@ def today(sites, now=None):
                          message_id=message['id'] if message else None,
                          detail='next in the queue' if message else 'the queue will be empty: nothing to send')
         entries.append(entry)
+    tomorrow = midnight + timedelta(days=1)
+    for site_id in timed:
+        for message in db.get_next_queued(site_id, 100):
+            at = max(message['send_after'] or now, now)
+            if at < tomorrow:
+                entries.append({'hour': at.hour, 'time': at.strftime('%H:%M'), 'site': names[site_id] if many else None,
+                                'status': 'scheduled', 'title': message['title'], 'message_id': message['id'],
+                                'detail': 'at its time' if message['send_after'] and message['send_after'] > now else 'now'})
     for delivery in deliveries:
+        if delivery['kind'] == 'time':
+            entries.append({'hour': delivery['start_time'].hour, 'time': delivery['start_time'].strftime('%H:%M'),
+                            'site': names[delivery['site_id']] if many else None, 'status': entry_status(delivery),
+                            'title': delivery['title'], 'message_id': delivery['message_id'],
+                            'detail': f"at its time: {delivery['success']}/{delivery['total']} delivered"})
         if delivery['kind'] == 'now':
             entries.append({'hour': delivery['start_time'].hour, 'time': delivery['start_time'].strftime('%H:%M'),
                             'site': names[delivery['site_id']] if many else None, 'status': entry_status(delivery),

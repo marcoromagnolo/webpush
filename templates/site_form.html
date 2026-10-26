@@ -73,6 +73,18 @@
                         <label class="form-label" for="default_lang">Language{{ info("Language of the texts of the notifications when the message has none (option lang), e.g. it-IT. It does not change the words added by the browser (e.g. from / via), which are in the language of the browser.") }}</label>
                         <input class="form-control" type="text" id="default_lang" name="default_lang" maxlength="35" value="{{ form.default_lang or '' }}" placeholder="it-IT">
                     </div>
+                    <div class="col-12">
+                        <label class="form-label d-block">Sending{{ info("When the queued messages are sent. Schedule: at every time of the page Schedules the first message of the queue goes to all the subscribers. Time of the message: every message goes at its date and time (send_after of the REST API or Send after of the console), a message without it at once; the schedule is kept but not used.") }}</label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="sending" id="sending-schedule" value="schedule" {% if form.sending != 'time' %}checked{% endif %}>
+                            <label class="form-check-label" for="sending-schedule">At the times of the schedule <span class="text-muted small">(page Schedules)</span></label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="sending" id="sending-time" value="time" {% if form.sending == 'time' %}checked{% endif %}>
+                            <label class="form-check-label" for="sending-time">At the time of each message <span class="text-muted small">(send_after; without it at once)</span></label>
+                        </div>
+                        {% if site and site.use_schedule %}<div class="form-text">Switching to the time of the messages: the queued messages whose time has already come (or without a time) are sent at once.</div>{% endif %}
+                    </div>
                     <div class="col-12 d-flex flex-wrap gap-4">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {% if form.enabled %}checked{% endif %}>

@@ -27,7 +27,8 @@ Requirements
 * MariaDB 10.6 or newer
 * Docker, also on your computer (the application runs only in its container)
 * A browser with Web Push: Chrome, Edge, Firefox; Safari 16+ on macOS, on iOS only for a site added to the Home screen
-* In production: the console and the API reachable on **https** by the browsers of the sites (nginx in front, e.g.
+* In production: the console and the API reachable on **https** by the browsers of the sites (nginx in front), best
+  on a domain of their own, e.g. `https://webpush.example.com` (or a path of a site,
   `https://www.example.com/notify`). The browsers subscribe only on https pages (or `localhost`), the console needs
   https (or `localhost`) for the test browsers.
 
@@ -286,7 +287,7 @@ needs an administrator: `exit` first.
                -e "s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASS|" \
                -e "s|^DB_NAME=.*|DB_NAME=webpush|" \
                -e "s|^WEB_PORT=.*|WEB_PORT=8080|" \
-               -e "s|^PUBLIC_URL=.*|PUBLIC_URL=https://www.example.com/notify|" \
+               -e "s|^PUBLIC_URL=.*|PUBLIC_URL=https://webpush.example.com|" \
                -e "s|^WEB_BEHIND_PROXY=.*|WEB_BEHIND_PROXY=true|" \
                -e "s|^JWT_SECRET_KEY=.*|JWT_SECRET_KEY=$(openssl rand -base64 48 | tr -d '/+=\n')|" \
                .env.example > .env
@@ -300,7 +301,7 @@ needs an administrator: `exit` first.
    `ERROR 1045 ... 'webpush'@'localhost' (using password: NO)` at the first `mariadb`: the account `webpush` of
    *Server setup*, step 3, is missing or has a password (its `ALTER USER`).
 
-   Then set `PUBLIC_URL` (the https address of the application, e.g. `https://www.example.com/notify`):
+   Then set `PUBLIC_URL` (the https address of the application, e.g. `https://webpush.example.com`):
 
        nano /srv/webpush/.env
 
@@ -317,24 +318,40 @@ needs an administrator: `exit` first.
 
 5. Check: `curl http://127.0.0.1:8080/health` (`{"ok":true}`).
 
-6. nginx (**as an administrator**: `exit` from the shell of `webpush`): the application on a path of a site with https, e.g. `/notify` of
-   `www.example.com` (in its `server` block):
+6. nginx (**as an administrator**: `exit` from the shell of `webpush`): the application on a domain of its own with
+   https, e.g. `webpush.example.com` (its DNS pointing to the server), in `/etc/nginx/sites-available/webpush.example.com`
+   linked in `sites-enabled`:
 
-       location /notify/ {
-           proxy_pass http://127.0.0.1:8080/;
-           proxy_http_version 1.1;
-           proxy_set_header Host $host;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-           proxy_set_header X-Forwarded-Host $host;
-           proxy_set_header X-Forwarded-Prefix /notify;
+       server {
+           server_name webpush.example.com;
+           client_max_body_size 1m;
+
+           location / {
+               proxy_pass http://127.0.0.1:8080;   # WEB_PORT of .env
+               proxy_http_version 1.1;
+               proxy_set_header Host $host;
+               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+               proxy_set_header X-Forwarded-Proto $scheme;
+               proxy_set_header X-Forwarded-Host $host;
+           }
+
+           listen 80;
+           listen [::]:80;
        }
 
-   Behind the Cloudflare proxy use `X-Forwarded-For $http_cf_connecting_ip` and `X-Forwarded-Proto https` (otherwise
-   the ip blacklist sees the ips of Cloudflare). Then `sudo nginx -t && sudo systemctl reload nginx` and
-   `curl https://www.example.com/notify/health`.
+   Then the certificate (certbot adds the `listen 443` lines and the redirect from http):
+   `sudo certbot --nginx -d webpush.example.com`. `duplicate listen options for [::]:443` at `nginx -t`: another site
+   has already `ipv6only=on` on `[::]:443`, remove it from the line of certbot (`listen [::]:443 ssl;`).
+   Then `sudo nginx -t && sudo systemctl reload nginx` and `curl https://webpush.example.com/health`.
 
-7. Right after the deploy open `https://www.example.com/notify/` and create the administrator: until then anyone
+   On a path of an existing site instead, e.g. `/notify` of `www.example.com` (in its `server` block, `PUBLIC_URL`
+   `https://www.example.com/notify`): `location /notify/` with `proxy_pass http://127.0.0.1:8080/;`, the same
+   headers and `proxy_set_header X-Forwarded-Prefix /notify;`.
+
+   Behind the Cloudflare proxy use `X-Forwarded-For $http_cf_connecting_ip` and `X-Forwarded-Proto https` (otherwise
+   the ip blacklist sees the ips of Cloudflare).
+
+7. Right after the deploy open `https://webpush.example.com/` and create the administrator: until then anyone
    reaching the console could create it. Then **Sites > New site**, **Integration** (code for the site),
    **API tokens** (token for the CMS), **Schedules**; the **Test page** of the site checks everything from your
    browser.
@@ -502,6 +519,11 @@ The queue is fed with few messages a day, e.g. the top news of the site (NewsPos
 of scrapynews, 3-5 a day): a news published at 23:00 leaves at 07:30, more messages than slots wait for the next slots.
 The schedule can't be empty (to stop the sendings disable the site); a day without times sends nothing.
 
+**At the time of each message** instead (Sites > the site > **Sending**, column `site.use_schedule` false): the
+schedule is not used and every message is sent to all the subscribers at its `send_after` (REST API, or *Send after*
+in the console), within 15 seconds; a message without it is sent at once. E.g. the CMS sends the date of publication
+of the post. Switching a site to this mode sends at once the queued messages whose time has already come.
+
 * Order of the queue: page **Messages** (arrows); a message with *Send after* waits for its time.
 * A slot with an empty queue, without subscribers or without keys sends nothing (yellow in **Home > Today**).
 * **Send now**: a message to all the subscribers of the site, at once. **Send test**: to the test browsers of the site
@@ -538,7 +560,7 @@ Body of `POST /sites/<code>/messages`:
 | `title` | required | max 255 characters |
 | `url` | optional | page opened by a click (shortcut of `options.data.url`) |
 | `options` | optional | [options of a notification](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification#options): body, icon, image, badge, dir, lang (default: Language of the site), tag, timestamp, requireInteraction, renotify, silent, vibrate, actions (max 2, `{"action", "title"}`), data |
-| `send_after` | optional | ISO 8601 date and time: not sent before |
+| `send_after` | optional | ISO 8601 date and time: with the schedule not sent before; site at the time of the messages (Sites > Sending) sent at this time, without it at once |
 
 Title and options together: at most 3500 bytes. The links of the buttons: `options.data.actions = {"<action>": "<url>"}`.
 The icon and the badge of the site are used when the message has none.
@@ -552,8 +574,8 @@ Console **Sites > the site > Integration** has the code with the values of the s
    `https://www.example.com/webpush-sw.js`.
 2. In the pages (e.g. footer of the theme):
 
-       <script src="https://www.example.com/notify/static/webpush-client.js" defer
-               data-api="https://www.example.com/notify/api/v1" data-site="news"
+       <script src="https://webpush.example.com/static/webpush-client.js" defer
+               data-api="https://webpush.example.com/api/v1" data-site="news"
                data-service-worker="/webpush-sw.js"></script>
        <button type="button" data-webpush-toggle hidden data-label-on="Disable notifications">Enable notifications</button>
 
@@ -591,6 +613,18 @@ On the server in the shell of the user `webpush` (`sudo -iu webpush`, then `cd /
 * Backup: `mariadb-dump webpush > ~/webpush-$(date +%F).sql`
 
 (as the user `webpush` on the server; in local `sudo mariadb`, `sudo mariadb-dump`)
+
+Move to another address (e.g. from `https://www.example.com/notify` to `https://webpush.example.com`): the
+subscriptions stay valid (they are bound to the VAPID keys of the sites, not to the address of WebPush).
+
+1. nginx of the new address (*Install*, step 6), the old one stays.
+2. `PUBLIC_URL` in `.env`, then `./docker-start.sh` (Docker reads `.env` only when it creates the container): the
+   notifications sent from now count the clicks at the new address, the console is at the new address (login again).
+3. The new API url in the CMS of every site (`data-api` of the integration code; NewsPostX: Theme Options > Push News),
+   then purge the cache of the site.
+4. Keep the old address in nginx: the service workers already installed in the browsers use it to renew a
+   subscription until the visitor comes back to the site (then they get the new url). Both addresses can stay for
+   good: they reach the same application.
 
 VAPID keys
 ==========

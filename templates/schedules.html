@@ -13,6 +13,10 @@
         {% elif message %}
             <div class="alert alert-success">{{ message }}</div>
         {% endif %}
+        {% if not site.use_schedule %}
+            <div class="alert alert-info">{{ site.name }} sends every message at its time (send_after), not with this schedule: it is kept but not used
+                (<a href="{{ url_for('site_edit', site_id=site.id) }}">Sites &gt; Sending</a>).</div>
+        {% endif %}
         {% if not site.enabled %}
             <div class="alert alert-warning">{{ site.name }} is disabled: its slots don't run (<a href="{{ url_for('site_edit', site_id=site.id) }}">Sites</a>).</div>
         {% endif %}

@@ -7,7 +7,7 @@ import notifier
 import vapid
 
 
-SLOT_SITE = {'id': 1, 'code': 'news', 'enabled': True, 'vapid_private_key': 'KEY'}
+SLOT_SITE = {'id': 1, 'code': 'news', 'enabled': True, 'vapid_private_key': 'KEY', 'use_schedule': True}
 SUBSCRIBERS = [{'id': i} for i in range(1, 8)]
 
 
@@ -39,6 +39,28 @@ def test_slot_no_longer_scheduled_sends_nothing(sending):
     notifier.send_slot(1, 1, 8, 0)  # not a slot of Monday (any more)
     notifier.send_slot(1, 2, 7, 30)  # 07:30 is not a slot of Tuesday
     assert sending == {}
+
+
+def test_slot_of_a_site_without_schedule_sends_nothing(sending, monkeypatch):
+    monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: dict(SLOT_SITE, use_schedule=False))
+    notifier.send_slot(1, 1, 7, 30)
+    assert sending == {}
+
+
+def test_due_messages_of_a_site_without_schedule(sending, monkeypatch):
+    from datetime import datetime
+    queue = [{'id': 10, 'title': 'A', 'options': None, 'send_after': datetime(2026, 10, 26, 9, 15)},
+             {'id': 11, 'title': 'B', 'options': None, 'send_after': None}]
+    statuses = []
+    monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: dict(SLOT_SITE, use_schedule=False))
+    monkeypatch.setattr(notifier.db, 'claim_next_message', lambda site_id: queue.pop(0) if queue else None)
+    monkeypatch.setattr(notifier.db, 'finish_message', lambda message_id, status: statuses.append((message_id, status)))
+    assert notifier.send_due(1) == 2  # all the messages whose time has come, one after the other
+    assert statuses == [(10, 'sent'), (11, 'sent')]
+    assert sending['kind'] == 'time' and sending['subscribers'] == SUBSCRIBERS
+    # a site with schedule: nothing at the time of the messages
+    monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: SLOT_SITE)
+    assert notifier.send_due(1) == 0
 
 
 def test_clean_message_keeps_known_options():

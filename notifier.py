@@ -242,6 +242,9 @@ def send_slot(site_id, day, hour, minute):
     if not can_send(site):
         return
     slot = f"{hour:02}:{minute:02}"
+    if not site['use_schedule']:
+        logger.info(f"Slot {slot} of {site['code']}: the site sends at the time of the messages, not with the schedule")
+        return
     if not any((s['day'], s['hour'], s['minute']) == (day, hour, minute) for s in db.get_slots(site_id)):
         logger.info(f"Slot {slot} of {site['code']} no longer scheduled")
         return
@@ -259,6 +262,26 @@ def send_slot(site_id, day, hour, minute):
         except Exception as e:
             db.finish_message(message['id'], 'failed')
             logger.error(f"Sending of message {message['id']} of {site['code']} failed: {e}", exc_info=True)
+
+
+def send_due(site_id):
+    """A site without schedule (use_schedule false): the messages of the queue whose time has come (send_after in the
+    past or none), one after the other, to all the active subscribers. The number of messages sent."""
+    site = db.get_site(site_id)
+    if not can_send(site) or site['use_schedule']:
+        return 0
+    sent = 0
+    while (message := db.claim_next_message(site_id)) is not None:
+        with errorlog.context(site_id, message['id']):
+            try:
+                at = message['send_after'].strftime('%H:%M') if message.get('send_after') else None
+                counts = deliver(site, message, db.get_active_subscribers(site_id), 'time', at)
+                db.finish_message(message['id'], 'failed' if counts['total'] and not counts['success'] else 'sent')
+            except Exception as e:
+                db.finish_message(message['id'], 'failed')
+                logger.error(f"Sending of message {message['id']} of {site['code']} failed: {e}", exc_info=True)
+        sent += 1
+    return sent
 
 
 def send_now(message_id):

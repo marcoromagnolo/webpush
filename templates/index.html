@@ -104,10 +104,10 @@
                                     {% if not s.has_keys %}<span class="badge bg-danger" title="Nothing can be sent">No keys</span>{% endif %}
                                 </td>
                                 <td class="text-end">{{ s.subscribers }}</td>
-                                <td class="text-end {{ 'text-danger' if s.enabled and s.slots and not s.queued }}"
-                                    title="{{ 'Empty queue: the next slots send nothing' if s.enabled and s.slots and not s.queued }}">{{ s.queued }}</td>
+                                <td class="text-end {{ 'text-danger' if s.enabled and s.use_schedule and s.slots and not s.queued }}"
+                                    title="{{ 'Empty queue: the next slots send nothing' if s.enabled and s.use_schedule and s.slots and not s.queued }}">{{ s.queued }}</td>
                                 <td class="text-end">{{ s.sent_today }}</td>
-                                <td class="text-end">{{ s.slots }}</td>
+                                <td class="text-end">{% if s.use_schedule %}{{ s.slots }}{% else %}<span class="text-muted" title="It sends every message at its time (Sites > Sending)">at the time</span>{% endif %}</td>
                                 <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('site_edit', site_id=s.id) }}">Settings</a></td>
                             </tr>
                         {% endfor %}
@@ -153,10 +153,10 @@
                             <span class="state-dot ms-2" style="background:#dc3545"></span>failed
                             <span class="state-dot ms-2" style="background:#ffc107"></span>nothing sent
                             <span class="state-dot ms-2" style="background:#0dcaf0"></span>sending
-                            <span class="state-dot ms-2" style="background:#0d6efd"></span>scheduled (next messages of the queue, in order)
+                            <span class="state-dot ms-2" style="background:#0d6efd"></span>scheduled (next messages of the queue)
                         </p>
                     {% else %}
-                        <p class="text-muted p-3 mb-0">No slot today{% if site %}: <a href="{{ url_for('schedules') }}">set the schedule</a>{% endif %}.</p>
+                        <p class="text-muted p-3 mb-0">{% if site and not site.use_schedule %}No message sent or to send today: {{ site.name }} sends every message at its time.{% else %}No slot today{% if site %}: <a href="{{ url_for('schedules') }}">set the schedule</a>{% endif %}.{% endif %}</p>
                     {% endif %}
                 </div>
             </div>
@@ -181,7 +181,7 @@
                                         {% if not site %}<br><span class="text-muted">{{ d.site_name }}</span>{% endif %}
                                     </td>
                                     <td class="small text-end text-nowrap">
-                                        {% if d.kind == 'test' %}<span class="badge bg-light text-dark border">test</span>{% elif d.kind == 'now' %}<span class="badge bg-light text-dark border">by hand</span>{% endif %}
+                                        {% if d.kind == 'test' %}<span class="badge bg-light text-dark border">test</span>{% elif d.kind == 'time' %}<span class="badge bg-light text-dark border">at its time</span>{% elif d.kind == 'now' %}<span class="badge bg-light text-dark border">by hand</span>{% endif %}
                                         <span class="{{ 'text-danger' if d.total and not d.success }}" title="delivered / sent">{{ d.success }}/{{ d.total }}</span>
                                     </td>
                                 </tr>
