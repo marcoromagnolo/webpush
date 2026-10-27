@@ -49,13 +49,14 @@ def today(sites, now=None):
                          detail='next in the queue' if message else 'the queue will be empty: nothing to send')
         entries.append(entry)
     tomorrow = midnight + timedelta(days=1)
+    delays = {site['id']: site.get('send_delay_minutes') or 0 for site in sites}
     for site_id in timed:
         for message in db.get_next_queued(site_id, 100):
-            at = max(message['send_after'] or now, now)
+            at = max(db.due_time(message, delays[site_id]), now)
             if at < tomorrow:
                 entries.append({'hour': at.hour, 'time': at.strftime('%H:%M'), 'site': names[site_id] if many else None,
                                 'status': 'scheduled', 'title': message['title'], 'message_id': message['id'],
-                                'detail': 'at its time' if message['send_after'] and message['send_after'] > now else 'now'})
+                                'detail': 'at its time' if at > now else 'now'})
     for delivery in deliveries:
         if delivery['kind'] == 'time':
             entries.append({'hour': delivery['start_time'].hour, 'time': delivery['start_time'].strftime('%H:%M'),

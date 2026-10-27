@@ -80,7 +80,7 @@ def update_user_password(user_id, password_hash):
 # Sites
 
 SITE_COLUMNS = ('code', 'name', 'url', 'allowed_origins', 'enabled', 'vapid_sub', 'ttl_seconds', 'default_icon',
-                'default_badge', 'default_lang', 'use_schedule')
+                'default_badge', 'default_lang', 'use_schedule', 'send_delay_minutes')
 
 
 def get_sites(enabled_only=False):
@@ -366,27 +366,40 @@ def count_messages_by_status(site_id=None):
 def get_next_queued(site_id, limit):
     """The next messages of the queue that can be sent now or later, in their order."""
     with cursor() as c:
-        c.execute("SELECT id, title, send_after FROM message WHERE site_id = %s AND status = 'queued'"
+        c.execute("SELECT id, title, send_after, created_at FROM message WHERE site_id = %s AND status = 'queued'"
                   " ORDER BY sort_order, id LIMIT %s", (site_id, limit))
         return c.fetchall()
 
 
+def due_time(message, delay_minutes):
+    """Time of a message of a site without schedule: its send_after (or its arrival) plus the delay of the site."""
+    return (message['send_after'] or message['created_at']) + timedelta(minutes=delay_minutes or 0)
+
+
 def get_sites_with_due_messages():
-    """Ids of the enabled sites without schedule with queued messages whose time has come (send_after past or none)."""
+    """Ids of the enabled sites without schedule with queued messages whose time has come: send_after (or the
+    arrival of the message) plus the delay of the site in the past."""
     with cursor() as c:
         c.execute("SELECT DISTINCT m.site_id FROM message m JOIN site s ON s.id = m.site_id"
                   " WHERE s.enabled = true AND s.use_schedule = false AND m.status = 'queued'"
-                  " AND (m.send_after IS NULL OR m.send_after <= %s)", (datetime.now(),))
+                  " AND COALESCE(m.send_after, m.created_at) + INTERVAL s.send_delay_minutes MINUTE <= %s",
+                  (datetime.now(),))
         return [row['site_id'] for row in c.fetchall()]
 
 
-def claim_next_message(site_id):
-    """The first message of the queue that can be sent now, marked as sending; None if there is none."""
+def claim_next_message(site_id, delay_minutes=None):
+    """The first message of the queue that can be sent now, marked as sending; None if there is none.
+    delay_minutes (site without schedule): the message leaves delay_minutes after its send_after or its arrival."""
     now = datetime.now()
+    if delay_minutes is None:
+        due = "(send_after IS NULL OR send_after <= %s)"
+        params = (site_id, now)
+    else:
+        due = "COALESCE(send_after, created_at) + INTERVAL %s MINUTE <= %s"
+        params = (site_id, delay_minutes, now)
     with cursor(commit=True) as c:
-        c.execute("SELECT id FROM message WHERE site_id = %s AND status = 'queued'"
-                  " AND (send_after IS NULL OR send_after <= %s) ORDER BY sort_order, id LIMIT 1 FOR UPDATE",
-                  (site_id, now))
+        c.execute(f"SELECT id FROM message WHERE site_id = %s AND status = 'queued' AND {due}"
+                  " ORDER BY sort_order, id LIMIT 1 FOR UPDATE", params)
         row = c.fetchone()
         if row is None:
             return None

@@ -398,6 +398,8 @@ def messages():
     rows, _ = db.get_messages(filters, pages['records_per_page'], pages['offset'])
     for row in rows:
         row['options_dict'] = json.loads(row['options']) if row['options'] else {}
+        if not site['use_schedule'] and row['status'] == 'queued':
+            row['due_at'] = db.due_time(row, site['send_delay_minutes'])
     return render_template("messages.html", title="Messages", messages=rows, filters=filters, paginate=pages,
                            page_site=site, counts=db.count_messages_by_status(site['id']), current_route='messages',
                            records_name='messages', args=list_args('status', 'q', 'records'),
@@ -692,6 +694,9 @@ DEFAULT_SLOTS = [(day, hour, minute) for day in range(1, 8) for hour, minute in 
 app.jinja_env.globals['DEFAULT_TIMES_TEXT'] = ' '.join(f"{h:02}:{m:02}" for h, m in DEFAULT_TIMES)
 
 
+MAX_SEND_DELAY_MINUTES = 7 * 24 * 60
+
+
 def form_to_site(form, site=None):
     """Values of the site form; ValueError if not valid."""
     values = {
@@ -708,6 +713,7 @@ def form_to_site(form, site=None):
         'default_lang': form.get('default_lang', '').strip() or None,
         # sending: 'schedule' (slots of the page Schedules) or 'time' (every message at its send_after)
         'use_schedule': form.get('sending', 'schedule') != 'time',
+        'send_delay_minutes': form.get('send_delay_minutes', type=int),
     }
     if not re.match(SITE_CODE_PATTERN, values['code']):
         raise ValueError("Code: 2-50 characters, lowercase letters, numbers and dash (it is in the API urls)")
@@ -720,6 +726,10 @@ def form_to_site(form, site=None):
             raise ValueError(f"{label}: an http(s) url")
     if not values['url']:
         raise ValueError("The url of the site is required")
+    if values['send_delay_minutes'] is None and not form.get('send_delay_minutes', '').strip():
+        values['send_delay_minutes'] = 0
+    if values['send_delay_minutes'] is None or not 0 <= values['send_delay_minutes'] <= MAX_SEND_DELAY_MINUTES:
+        raise ValueError(f"Delay: minutes from 0 to {MAX_SEND_DELAY_MINUTES} (7 days)")
     if values['default_lang'] and not re.match(r"^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$", values['default_lang']):
         raise ValueError("Language: a code like it or it-IT")
     for origin in (values['allowed_origins'] or '').splitlines():
@@ -742,7 +752,7 @@ def sites():
 @app.route("/sites/new", methods=["GET", "POST"])
 @jwt_required()
 def site_new():
-    form = {'enabled': True, 'ttl_hours': 24, 'generate_keys': True, 'sending': 'schedule'}
+    form = {'enabled': True, 'ttl_hours': 24, 'generate_keys': True, 'sending': 'schedule', 'send_delay_minutes': 0}
     error = None
     if request.method == 'POST':
         form = request.form.to_dict()
@@ -767,7 +777,8 @@ def site_new():
 def site_page(site, form=None, error=None, key_error=None):
     form = form or dict(site, ttl_hours=site['ttl_seconds'] // 3600, allowed_origins=site['allowed_origins'] or '',
                         default_icon=site['default_icon'] or '', default_badge=site['default_badge'] or '',
-                        default_lang=site['default_lang'] or '', sending='schedule' if site['use_schedule'] else 'time')
+                        default_lang=site['default_lang'] or '', sending='schedule' if site['use_schedule'] else 'time',
+                        send_delay_minutes=site['send_delay_minutes'])
     return render_template("site_form.html", title="Sites", site=site, form=form, error=error, key_error=key_error,
                            public_url=settings.PUBLIC_URL, origins=sorted(api.site_origins(site)),
                            test_subscribers=db.get_test_subscribers(site['id']),

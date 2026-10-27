@@ -47,11 +47,15 @@ def test_site_form(monkeypatch):
     assert values['default_lang'] is None
     assert values['use_schedule'] is True  # default: the schedule
     assert webapp.form_to_site(MultiDict(dict(SITE_FORM, sending='time')))['use_schedule'] is False
+    assert values['send_delay_minutes'] == 0  # empty: no delay
+    assert webapp.form_to_site(MultiDict(dict(SITE_FORM, send_delay_minutes='30')))['send_delay_minutes'] == 30
     assert webapp.form_to_site(MultiDict(dict(SITE_FORM, default_lang=' it-IT ')))['default_lang'] == 'it-IT'
 
 
 @pytest.mark.parametrize('field, value', [('code', 'News Site'), ('url', 'ftp://x'), ('vapid_sub', 'a@news.example'),
                                           ('ttl_hours', '0'), ('default_lang', 'italiano'),
+                                          ('send_delay_minutes', '-1'), ('send_delay_minutes', '20000'),
+                                          ('send_delay_minutes', 'soon'),
                                           ('allowed_origins', 'https://m.news.example/path')])
 def test_site_form_errors(monkeypatch, field, value):
     monkeypatch.setattr(webapp.db, 'get_site', lambda site_id=None, code=None: None)

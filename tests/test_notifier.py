@@ -49,15 +49,19 @@ def test_slot_of_a_site_without_schedule_sends_nothing(sending, monkeypatch):
 
 def test_due_messages_of_a_site_without_schedule(sending, monkeypatch):
     from datetime import datetime
-    queue = [{'id': 10, 'title': 'A', 'options': None, 'send_after': datetime(2026, 10, 26, 9, 15)},
-             {'id': 11, 'title': 'B', 'options': None, 'send_after': None}]
+    queue = [{'id': 10, 'title': 'A', 'options': None, 'send_after': datetime(2026, 10, 26, 9, 15), 'created_at': None},
+             {'id': 11, 'title': 'B', 'options': None, 'send_after': None, 'created_at': datetime(2026, 10, 26, 9, 20)}]
     statuses = []
-    monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: dict(SLOT_SITE, use_schedule=False))
-    monkeypatch.setattr(notifier.db, 'claim_next_message', lambda site_id: queue.pop(0) if queue else None)
+    claims = []
+    monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: dict(SLOT_SITE, use_schedule=False, send_delay_minutes=30))
+    monkeypatch.setattr(notifier.db, 'claim_next_message',
+                        lambda site_id, delay=None: claims.append(delay) or (queue.pop(0) if queue else None))
     monkeypatch.setattr(notifier.db, 'finish_message', lambda message_id, status: statuses.append((message_id, status)))
     assert notifier.send_due(1) == 2  # all the messages whose time has come, one after the other
     assert statuses == [(10, 'sent'), (11, 'sent')]
     assert sending['kind'] == 'time' and sending['subscribers'] == SUBSCRIBERS
+    assert set(claims) == {30}  # the delay of the site
+    assert sending['slot'] == '09:50'  # time of the last one: its arrival + 30 minutes
     # a site with schedule: nothing at the time of the messages
     monkeypatch.setattr(notifier.db, 'get_site', lambda site_id: SLOT_SITE)
     assert notifier.send_due(1) == 0

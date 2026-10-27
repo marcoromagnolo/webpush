@@ -83,6 +83,27 @@
                             <input class="form-check-input" type="radio" name="sending" id="sending-time" value="time" {% if form.sending == 'time' %}checked{% endif %}>
                             <label class="form-check-label" for="sending-time">At the time of each message <span class="text-muted small">(send_after; without it at once)</span></label>
                         </div>
+                        <div class="d-flex align-items-center gap-2 mt-2" id="send-delay">
+                            <label class="form-label small mb-0" for="send_delay_minutes">Delay{{ info("Only for the sending at the time of each message: the message is sent these minutes after its time (send_after), or after its arrival when it has no time. 0: at its time. E.g. 30 with the date of publication of the post: the notification 30 minutes after the publication.") }}</label>
+                            <input class="form-control form-control-sm" style="width: 7rem;" type="number" min="0" max="10080" step="1"
+                                   id="send_delay_minutes" name="send_delay_minutes" value="{{ form.send_delay_minutes if form.send_delay_minutes not in (None, '') else 0 }}">
+                            <span class="small text-muted">minutes after the time of the message</span>
+                        </div>
+                        <script>
+                            // the delay counts only for the sending at the time of each message
+                            (function () {
+                                var delay = document.getElementById('send_delay_minutes');
+                                function update() {
+                                    // read only, not disabled: the value is kept when the site goes back to the schedule
+                                    delay.readOnly = !document.getElementById('sending-time').checked;
+                                    document.getElementById('send-delay').classList.toggle('opacity-50', delay.readOnly);
+                                }
+                                document.querySelectorAll('input[name="sending"]').forEach(function (radio) {
+                                    radio.addEventListener('change', update);
+                                });
+                                update();
+                            })();
+                        </script>
                         {% if site and site.use_schedule %}<div class="form-text">Switching to the time of the messages: the queued messages whose time has already come (or without a time) are sent at once.</div>{% endif %}
                     </div>
                     <div class="col-12 d-flex flex-wrap gap-4">

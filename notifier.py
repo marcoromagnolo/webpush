@@ -265,16 +265,18 @@ def send_slot(site_id, day, hour, minute):
 
 
 def send_due(site_id):
-    """A site without schedule (use_schedule false): the messages of the queue whose time has come (send_after in the
-    past or none), one after the other, to all the active subscribers. The number of messages sent."""
+    """A site without schedule (use_schedule false): the messages of the queue whose time has come (send_after, or the
+    arrival of the message, plus the delay of the site), one after the other, to all the active subscribers.
+    The number of messages sent."""
     site = db.get_site(site_id)
     if not can_send(site) or site['use_schedule']:
         return 0
     sent = 0
-    while (message := db.claim_next_message(site_id)) is not None:
+    delay = site.get('send_delay_minutes') or 0
+    while (message := db.claim_next_message(site_id, delay)) is not None:
         with errorlog.context(site_id, message['id']):
             try:
-                at = message['send_after'].strftime('%H:%M') if message.get('send_after') else None
+                at = db.due_time(message, delay).strftime('%H:%M')
                 counts = deliver(site, message, db.get_active_subscribers(site_id), 'time', at)
                 db.finish_message(message['id'], 'failed' if counts['total'] and not counts['success'] else 'sent')
             except Exception as e:

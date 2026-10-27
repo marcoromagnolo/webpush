@@ -522,7 +522,8 @@ The schedule can't be empty (to stop the sendings disable the site); a day witho
 **At the time of each message** instead (Sites > the site > **Sending**, column `site.use_schedule` false): the
 schedule is not used and every message is sent to all the subscribers at its `send_after` (REST API, or *Send after*
 in the console), within 15 seconds; a message without it is sent at once. E.g. the CMS sends the date of publication
-of the post. Switching a site to this mode sends at once the queued messages whose time has already come.
+of the post. **Delay** (minutes, `site.send_delay_minutes`): every message leaves that long after its time (or after its
+arrival when it has none), e.g. 30: the notification half an hour after the publication. Switching a site to this mode sends at once the queued messages whose time has already come.
 
 * Order of the queue: page **Messages** (arrows); a message with *Send after* waits for its time.
 * A slot with an empty queue, without subscribers or without keys sends nothing (yellow in **Home > Today**).
@@ -560,7 +561,7 @@ Body of `POST /sites/<code>/messages`:
 | `title` | required | max 255 characters |
 | `url` | optional | page opened by a click (shortcut of `options.data.url`) |
 | `options` | optional | [options of a notification](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/showNotification#options): body, icon, image, badge, dir, lang (default: Language of the site), tag, timestamp, requireInteraction, renotify, silent, vibrate, actions (max 2, `{"action", "title"}`), data |
-| `send_after` | optional | ISO 8601 date and time: with the schedule not sent before; site at the time of the messages (Sites > Sending) sent at this time, without it at once |
+| `send_after` | optional | ISO 8601 date and time: with the schedule not sent before; site at the time of the messages (Sites > Sending) sent at this time plus the delay of the site, without it at once (plus the delay) |
 
 Title and options together: at most 3500 bytes. The links of the buttons: `options.data.actions = {"<action>": "<url>"}`.
 The icon and the badge of the site are used when the message has none.

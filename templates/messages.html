@@ -52,8 +52,9 @@
                         subscribers (<a href="{{ url_for('schedules') }}">schedule of {{ site.name }}</a>).
                         A message with <i>Send after</i> waits for its time, the next ones go ahead.
                     {% else %}
-                        {{ site.name }} sends every message at its time (<i>Send after</i>), to all the subscribers; a message
-                        without a time leaves at once (<a href="{{ url_for('site_edit', site_id=site.id) }}">Sites &gt; Sending</a>).
+                        {{ site.name }} sends every message at its time (<i>Send after</i>){% if site.send_delay_minutes %} plus
+                        {{ site.send_delay_minutes }} minutes{% endif %}, to all the subscribers; a message without a time leaves
+                        {{ site.send_delay_minutes ~ ' minutes after its arrival' if site.send_delay_minutes else 'at once' }} (<a href="{{ url_for('site_edit', site_id=site.id) }}">Sites &gt; Sending</a>).
                     {% endif %}
                     <b>Send now</b> sends it at once to all the subscribers of the site.
                 </div>
@@ -100,7 +101,8 @@
                                         {% if not queue %}<span class="badge {{ MESSAGE_BADGES[m.status] }}">{{ MESSAGE_STATUSES[m.status] }}</span>{% endif %}
                                         {% if o.body %}<div class="text-muted small text-truncate-2">{{ o.body }}</div>{% endif %}
                                         {% if o.data and o.data.url %}<div class="small text-truncate"><a href="{{ o.data.url }}" target="_blank" rel="noopener" class="link-secondary">{{ o.data.url }}</a></div>{% endif %}
-                                        {% if m.send_after and m.status == 'queued' %}<div class="small text-warning-emphasis">{{ 'Not before' if site.use_schedule else 'Sent at' }} {{ m.send_after.strftime('%d/%m/%Y %H:%M') }}</div>{% endif %}
+                                        {% if m.due_at %}<div class="small text-warning-emphasis">Sent at {{ m.due_at.strftime('%d/%m/%Y %H:%M') }}{% if site.send_delay_minutes %} <span class="text-muted">({{ 'time' if m.send_after else 'arrival' }} + {{ site.send_delay_minutes }} min)</span>{% endif %}</div>
+                                        {% elif m.send_after and m.status == 'queued' %}<div class="small text-warning-emphasis">Not before {{ m.send_after.strftime('%d/%m/%Y %H:%M') }}</div>{% endif %}
                                     </div>
                                 </div>
                             </td>

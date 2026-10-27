@@ -16,6 +16,7 @@ create table if not exists site(
 	default_badge varchar(1000) null default null,
 	default_lang varchar(35) null default null,  -- lang of the notifications without one (BCP 47, e.g. it-IT)
 	use_schedule boolean not null default true,  -- true: the slots of the schedule send the queue; false: every message at its send_after (none: at once)
+	send_delay_minutes int not null default 0,  -- use_schedule false: minutes after the send_after (or the arrival) of the message
 	created_at timestamp not null default current_timestamp,
 	primary key(id),
 	unique key unique_site_code (code)
